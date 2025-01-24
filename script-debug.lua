@@ -180,143 +180,57 @@ function test01(a, r)
         end
       ))
 end
+--local ji = ''
+--local ji2 = 1
 
-local ji = ''
-local ji2 = 1
-addr = 0
-name = ''
-val = 0
-aaa = 'Test Text'
+break_point_label = ''
+--
+exec_addr = 0
+exec_addr_str = '0'
+--
+read_write_change_addr = 0
+read_write_change_addr_str = '0'
 function DrawImguiFrame()
-    local window = imgui.Begin('Debug Script', true)
-    if not window then imgui.End() return end
+  local window = imgui.Begin('Debug Script', true)
+  if not window then imgui.End() return end
     
-    imgui.TextUnformatted(string.format('Address:  %x    ', addr))
-    imgui.SameLine()
-    imgui.TextUnformatted(string.format('Name:  %s    ', name))
-    imgui.SameLine()
-    imgui.TextUnformatted(string.format('Value:  %s    ', val))
-    if imgui.Button('Exec') then break_point_exec(addr, name, 'Exec', 1) end
-    imgui.SameLine()
-    if imgui.Button('Read') then break_point_exec(addr, name, 'Read', 1) end
-    imgui.SameLine()
-    if imgui.Button('Write') then break_point_exec(addr, name, 'Write', 1) end
-    imgui.PushItemWidth(50)
-    if imgui.BeginCombo('##Combo 1', reg) then
-        for i = 1, #registers do
-            local is_selected = reg == registers[i]
-            if imgui.Selectable(registers[i]) then reg = registers[i] end
-            if is_selected then imgui.SetItemDefaultFocus() end
-        end
-        imgui.EndCombo()
+  imgui.TextUnformatted('Name:')
+  imgui.SameLine()
+	local ccc, bbb = imgui.extra.InputText('##break-point-label', break_point_label)
+	if ccc then break_point_label = bbb end
+  
+  imgui.TextUnformatted('Address:')
+  imgui.SameLine()
+  imgui.SetNextItemWidth(75)
+  ccc, bbb = imgui.extra.InputText('##exec-address', exec_addr_str)
+  if ccc then
+    ccc = tonumber(bbb, 16)
+    if ccc then
+      exec_addr = ccc
+      exec_addr_str = string.format('0x%08x', ccc)
     end
-    imgui.PopItemWidth()
-    imgui.SameLine()
-    if imgui.Button('What Instruction Access') then what_ins_access_base(addr, name, reg) end
-    imgui.SameLine()
-    if imgui.Button('Breakpoint on Register') then break_point_register(addr, reg, val) end
-    if imgui.Button('What Access This') then what_access_this_base(addr, name) end
-    imgui.SameLine()
-    if imgui.Button('Breakpoint on Memory Value') then break_point_memory(addr, val, 'Write', 1) end
-    
-    imgui.TextUnformatted('What Instruction Accesses:')
-    imgui.SameLine(180)
-    imgui.TextUnformatted('What Access this Address:')
-    imgui.PushItemWidth(150)
-    if imgui.BeginListBox("##What Instruction Accesses") then
-		for key, v in pairs(table_what_instruction_access) do
-			local is_selected = ji == key
-			if imgui.Selectable(key, is_selected) then
-				imgui.SetClipboardText(key)
-				PCSX.GUI.jumpToMemory(v)
-				ji = key
-			end
-			if is_selected then imgui.SetItemDefaultFocus() end
-		end
-		imgui.EndListBox()
-	end
-    imgui.SameLine(180)
-    if imgui.BeginListBox("##What Access this Address") then
-		for key, v in pairs(table_what_access_this) do
-			local is_selected = ji == key
-			if imgui.Selectable(key, is_selected) then
-				imgui.SetClipboardText(string.sub(key, 0, string.find(key, ' - ') - 1))
-				PCSX.GUI.jumpToPC(v)
-				ji = key
-			end
-			if is_selected then imgui.SetItemDefaultFocus() end
-		end
-		imgui.EndListBox()
-	end
-    if imgui.Button('Copy###Copy 1') then
-        local s = ''
-        for key, _ in pairs(table_what_instruction_access) do s = s .. key .. '\n' end
-        imgui.SetClipboardText(s)
+  end
+  imgui.SameLine()
+  if imgui.Button('Exec##exec') then print('exec: ', exec_addr_str) end
+  
+  imgui.TextUnformatted('Address:')
+  imgui.SameLine()
+  imgui.SetNextItemWidth(75)
+  ccc, bbb = imgui.extra.InputText('##read-write-change-address', read_write_change_addr_str)
+  if ccc then
+    ccc = tonumber(bbb, 16)
+    if (ccc) then
+      read_write_change_addr = ccc
+      read_write_change_addr_str = string.format('0x%08x', ccc)
     end
-    imgui.SameLine()
-    if imgui.Button('Clear###Clear 1') then table_what_instruction_access = {} end
-    imgui.SameLine(180)
-    if imgui.Button('Clear###Clear 2') then table_what_access_this = {} end
-    imgui.PopItemWidth()
-
-    -- TEST --
-    imgui.Separator()
-    if imgui.Button('Test 01') then test01(addr, reg) end
-    imgui.SameLine()
-    if imgui.Button('Copy###Copy 3') then
-      local s = ''
-      for i = 1, #test02_arrange do
-        j = test02_arrange[i]
-        s = s .. string.format('%02d - %08x - %d\n', i, j, test02_counter[j])
-      end
-      imgui.SetClipboardText(s)
-    end
-    imgui.SameLine()
-    if imgui.Button('Clear###Clear 3') then
-      test02_arrange = {}
-      test02_counter = {}
-      test02_total = 0
-    end
-    imgui.TextUnformatted('No.  -  Address  -  Count')
-    if imgui.BeginListBox('###Test 01_box') then
-		if test02_arrange[1] ~= nil then
-		  for i = 1, #test02_arrange do
-			local is_selected = ji2 == i
-			j = test02_arrange[i]
-			if imgui.Selectable(string.format('%02d - %08x - %d###%d', i, j, test02_counter[j], j), is_selected) then
-			  ji2 = i
-			  PCSX.GUI.jumpToPC(j)
-			  imgui.SetClipboardText(string.format('%x', j))
-			end
-			if is_selected then imgui.SetItemDefaultFocus() end
-		  end
-		end
-		imgui.EndListBox()
-	end
-    
-	imgui.TextUnformatted('value: ' .. aaa)
-	local ccc, bbb = imgui.extra.InputText('insert here: ', aaa)
-	if ccc then aaa = bbb end
-	
-    imgui.End()
-    
-  -- if imgui.Begin('Debug ScRIPT2', true) then
-    -- if imgui.BeginTable("dkfjkdfjdf", 2) then
-      -- imgui.TableNextRow()
-      -- imgui.TableNextColumn()
-      -- imgui.TextUnformatted('1')
-      -- imgui.TableNextColumn()
-      -- imgui.TextUnformatted('data 1')
-      
-      -- imgui.TableNextRow()
-      -- imgui.TableNextColumn()
-      -- imgui.TextUnformatted('2')
-      -- imgui.TableNextColumn()
-      -- imgui.TextUnformatted('data 2')
-      
-      -- imgui.EndTable()
-    -- end
-    -- imgui.End()
-  -- end
+  end
+  imgui.SameLine()
+  if imgui.Button('Read##read-write-change1') then print('Read: ', read_write_change_addr_str) end
+  imgui.SameLine()
+  if imgui.Button('Write##read-write-change2') then print('Write: ', read_write_change_addr_str) end
+  imgui.SameLine()
+  if imgui.Button('Write Change##read-write-change3') then print('Write Change: ', read_write_change_addr_str) end
+  
+  imgui.End()
 end
 print('Debugging Script is Loaded')

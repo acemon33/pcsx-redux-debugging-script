@@ -3,6 +3,16 @@ local memory1 = ffi.cast('uint8_t*', PCSX.getMemPtr())
 local memory2 = PCSX.getMemPtr()
 local counter = 0
 
+
+function break_point_exec(address, name, type_, bytes)
+    if address < 1 then return end
+    if address < 0x80000000 then address = address + 0x80000000 end
+    break_point_list[counter] = PCSX.addBreakpoint(address, type_, bytes, name, function(address, w, c) PCSX.pauseEmulator() end)
+    counter = counter + 1
+end
+
+
+--[[
 function get_register_value(r)
     local regs = 0xBAADF00D
     if r == 's0' then regs = PCSX.getRegisters().GPR.n.s0
@@ -32,13 +42,6 @@ function get_register_value(r)
     elseif r == 'a3' then regs = PCSX.getRegisters().GPR.n.a3
     end
     return regs
-end
-
-function break_point_exec(a, n, t, b)
-    if a < 1 then return end
-    if a < 0x80000000 then a = a + 0x80000000 end
-    break_point_list[counter] = PCSX.addBreakpoint(a, t, b, n, function(a, w, c) PCSX.pauseEmulator() end)
-    counter = counter + 1
 end
 
 function bpe(a, n)
@@ -180,24 +183,29 @@ function test01(a, r)
         end
       ))
 end
---local ji = ''
---local ji2 = 1
+local ji = ''
+local ji2 = 1
+]]
+
 
 break_point_label = ''
+byte_list = { { name ='Byte', value = 1}, { name ='2 Bytes', value = 2}, { name ='4 Bytes', value = 4} }
 --
 exec_addr = 0
 exec_addr_str = '0'
 --
 read_write_change_addr = 0
 read_write_change_addr_str = '0'
+read_write_change_bytes = 0
+read_write_change_bytes_str = 'Byte'
 function DrawImguiFrame()
   local window = imgui.Begin('Debug Script', true)
   if not window then imgui.End() return end
     
   imgui.TextUnformatted('Name:')
   imgui.SameLine()
-	local ccc, bbb = imgui.extra.InputText('##break-point-label', break_point_label)
-	if ccc then break_point_label = bbb end
+  local ccc, bbb = imgui.extra.InputText('##break-point-label', break_point_label)
+  if ccc then break_point_label = bbb end
   
   imgui.TextUnformatted('Address:')
   imgui.SameLine()
@@ -211,7 +219,7 @@ function DrawImguiFrame()
     end
   end
   imgui.SameLine()
-  if imgui.Button('Exec##exec') then print('exec: ', exec_addr_str) end
+  if imgui.Button('Exec##exec') then break_point_exec(exec_addr, break_point_label, 'Exec', 1) end
   
   imgui.TextUnformatted('Address:')
   imgui.SameLine()
@@ -225,11 +233,19 @@ function DrawImguiFrame()
     end
   end
   imgui.SameLine()
-  if imgui.Button('Read##read-write-change1') then print('Read: ', read_write_change_addr_str) end
+  -- imgui.Combo("##read-write-change-bytes", read_write_change_bytes, byte_list2, 3)
+  imgui.PushItemWidth(70)
+  imgui.safe.BeginCombo( '##Area', read_write_change_bytes_str , function()
+    for k, v in pairs(byte_list) do
+      if imgui.Selectable( v.name ) then read_write_change_bytes = v.value; read_write_change_bytes_str = v.name end
+    end
+  end)
   imgui.SameLine()
-  if imgui.Button('Write##read-write-change2') then print('Write: ', read_write_change_addr_str) end
+  if imgui.Button('Read##read-write-change1') then break_point_exec(read_write_change_addr, break_point_label, 'Read', read_write_change_bytes) end
   imgui.SameLine()
-  if imgui.Button('Write Change##read-write-change3') then print('Write Change: ', read_write_change_addr_str) end
+  if imgui.Button('Write##read-write-change2') then break_point_exec(read_write_change_addr, break_point_label, 'Write', read_write_change_bytes) end
+  imgui.SameLine()
+  if imgui.Button('Write Change##read-write-change3') then break_point_exec(read_write_change_addr, break_point_label, 'Write', read_write_change_bytes) end
   
   imgui.End()
 end

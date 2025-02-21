@@ -1,3 +1,5 @@
+local bit = require("bit")
+
 local break_point_list = {}
 local memory1 = ffi.cast('uint8_t*', PCSX.getMemPtr())
 local memory2 = PCSX.getMemPtr()
@@ -11,6 +13,38 @@ function break_point_exec(address, name, type_, bytes)
     counter = counter + 1
 end
 
+storeOpcodes = {
+    [0x28] = 'STORE', -- sb
+    [0x29] = 'STORE', -- sh
+    [0x2a] = 'STORE', -- swl
+    [0x2b] = 'STORE', -- sw
+    [0x2e] = 'STORE', -- swr
+    [0x3a] = 'STORE', -- swc2
+}
+function isStore(code)
+  opcode = bit.rshift(code, 26)
+  local t = storeOpcodes[opcode]
+  if t == nil then
+      return false, nil
+  end
+  offsett = bit.band(code, 0xffff)
+  return true, offsett
+end
+
+function testt()
+  str = ''
+  str = str .. string.format("%02x", PCSX.getMemPtr()[(PCSX.getRegisters().pc - 0x80000000 + 3)])
+  str = str .. string.format("%02x", PCSX.getMemPtr()[(PCSX.getRegisters().pc - 0x80000000 + 2)])
+  str = str .. string.format("%02x", PCSX.getMemPtr()[(PCSX.getRegisters().pc - 0x80000000 + 1)])
+  str = str .. string.format("%02x", PCSX.getMemPtr()[(PCSX.getRegisters().pc - 0x80000000)])
+  code = tonumber('0x' .. str)
+  a, b = isStore(code)
+  if a then
+    print('yes', string.format('0x%x', b))
+  else
+    print('no')
+  end
+end
 
 --[[
 function get_register_value(r)
@@ -245,7 +279,7 @@ function DrawImguiFrame()
   imgui.SameLine()
   if imgui.Button('Write##read-write-change2') then break_point_exec(read_write_change_addr, break_point_label, 'Write', read_write_change_bytes) end
   imgui.SameLine()
-  if imgui.Button('Write Change##read-write-change3') then break_point_exec(read_write_change_addr, break_point_label, 'Write', read_write_change_bytes) end
+  if imgui.Button('Write Change##read-write-change3') then testt() end
   
   imgui.End()
 end

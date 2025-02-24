@@ -7,10 +7,11 @@ local counter = 0
 
 
 function break_point_exec(address, name, type_, bytes)
-    if address < 1 then return end
-    if address < 0x80000000 then address = address + 0x80000000 end
-    break_point_list[counter] = PCSX.addBreakpoint(address, type_, bytes, name, function(address, w, c) PCSX.pauseEmulator() end)
-    counter = counter + 1
+  print(string.format('0x%x', address), name, type_, bytes)
+  if address < 1 then return end
+  if address < 0x80000000 then address = address + 0x80000000 end
+  break_point_list[counter] = PCSX.addBreakpoint(address, type_, bytes, name, function(address, w, c) PCSX.pauseEmulator() end)
+  counter = counter + 1
 end
 
 storeOpcodes = {
@@ -30,20 +31,71 @@ function isStore(code)
   offsett = bit.band(code, 0xffff)
   return true, offsett
 end
-
-function testt()
-  str = ''
-  str = str .. string.format("%02x", PCSX.getMemPtr()[(PCSX.getRegisters().pc - 0x80000000 + 3)])
-  str = str .. string.format("%02x", PCSX.getMemPtr()[(PCSX.getRegisters().pc - 0x80000000 + 2)])
-  str = str .. string.format("%02x", PCSX.getMemPtr()[(PCSX.getRegisters().pc - 0x80000000 + 1)])
-  str = str .. string.format("%02x", PCSX.getMemPtr()[(PCSX.getRegisters().pc - 0x80000000)])
-  code = tonumber('0x' .. str)
-  a, b = isStore(code)
-  if a then
-    print('yes', string.format('0x%x', b))
-  else
-    print('no')
+function get_register_value_from_bits(b)
+  if b == 0x01 then return PCSX.getRegisters().GPR.n.at
+  elseif b == 0x02 then return PCSX.getRegisters().GPR.n.v0
+  elseif b == 0x03 then return PCSX.getRegisters().GPR.n.v1
+  elseif b == 0x04 then return PCSX.getRegisters().GPR.n.a0
+  elseif b == 0x05 then return PCSX.getRegisters().GPR.n.a1
+  elseif b == 0x06 then return PCSX.getRegisters().GPR.n.a2
+  elseif b == 0x07 then return PCSX.getRegisters().GPR.n.a3
+  elseif b == 0x08 then return PCSX.getRegisters().GPR.n.t0
+  elseif b == 0x09 then return PCSX.getRegisters().GPR.n.t1
+  elseif b == 0x0a then return PCSX.getRegisters().GPR.n.t2
+  elseif b == 0x0b then return PCSX.getRegisters().GPR.n.t3
+  elseif b == 0x0c then return PCSX.getRegisters().GPR.n.t4
+  elseif b == 0x0d then return PCSX.getRegisters().GPR.n.t5
+  elseif b == 0x0e then return PCSX.getRegisters().GPR.n.t6
+  elseif b == 0x0f then return PCSX.getRegisters().GPR.n.t7
+  elseif b == 0x10 then return PCSX.getRegisters().GPR.n.s0
+  elseif b == 0x11 then return PCSX.getRegisters().GPR.n.s1
+  elseif b == 0x12 then return PCSX.getRegisters().GPR.n.s2
+  elseif b == 0x13 then return PCSX.getRegisters().GPR.n.s3
+  elseif b == 0x14 then return PCSX.getRegisters().GPR.n.s4
+  elseif b == 0x15 then return PCSX.getRegisters().GPR.n.s5
+  elseif b == 0x16 then return PCSX.getRegisters().GPR.n.s6
+  elseif b == 0x17 then return PCSX.getRegisters().GPR.n.s7
+  elseif b == 0x18 then return PCSX.getRegisters().GPR.n.t8
+  elseif b == 0x19 then return PCSX.getRegisters().GPR.n.t9
+  elseif b == 0x1c then return PCSX.getRegisters().GPR.n.gp
+  elseif b == 0x1d then return PCSX.getRegisters().GPR.n.sp
+  elseif b == 0x1f then return PCSX.getRegisters().GPR.n.ra
   end
+end
+function get_4_byte_from_memory(address)
+  str = ''
+  str = str .. string.format("%02x", PCSX.getMemPtr()[(address - 0x80000000 + 3)])
+  str = str .. string.format("%02x", PCSX.getMemPtr()[(address - 0x80000000 + 2)])
+  str = str .. string.format("%02x", PCSX.getMemPtr()[(address - 0x80000000 + 1)])
+  str = str .. string.format("%02x", PCSX.getMemPtr()[(address - 0x80000000)])
+  return tonumber('0x' .. str)
+end
+function get_2_byte_from_memory(address)
+  str = ''
+  str = str .. string.format("%02x", PCSX.getMemPtr()[(address - 0x80000000 + 1)])
+  str = str .. string.format("%02x", PCSX.getMemPtr()[(address - 0x80000000)])
+  return tonumber('0x' .. str)
+end
+function break_point_exec_on_write_change_fun(address, bytes, label)
+  code = get_4_byte_from_memory(PCSX.getRegisters().pc)
+  isStoreCode, offset = isStore(code)
+  if isStoreCode then
+    address = get_register_value_from_bits(bit.band(bit.rshift(code, 21), 0x1f)) + offset
+    new_value = get_register_value_from_bits(bit.band(bit.rshift(code, 16), 0x1f))
+    
+    old_value = PCSX.getMemPtr()[(address - 0x80000000)]
+    if bytes == 2 then old_value = get_2_byte_from_memory(address)
+    elseif bytes == 1 then old_value = get_4_byte_from_memory(address)
+    end
+
+    if old_value ~= new_value then
+      PCSX.pauseEmulator()
+    end
+  end
+end
+function break_point_exec_on_write_change(address, name, bytes)
+  break_point_list[counter] = PCSX.addBreakpoint(address, 'Write', bytes, name, break_point_exec_on_write_change_fun)
+  counter = counter + 1
 end
 
 --[[
@@ -223,14 +275,14 @@ local ji2 = 1
 
 
 break_point_label = ''
-byte_list = { { name ='Byte', value = 1}, { name ='2 Bytes', value = 2}, { name ='4 Bytes', value = 4} }
+byte_list = { ['4 Bytes'] = 4, ['2 Byte'] = 2, ['Byte'] = 1 }
 --
 exec_addr = 0
 exec_addr_str = '0'
 --
 read_write_change_addr = 0
 read_write_change_addr_str = '0'
-read_write_change_bytes = 0
+read_write_change_bytes = 1
 read_write_change_bytes_str = 'Byte'
 function DrawImguiFrame()
   local window = imgui.Begin('Debug Script', true)
@@ -271,7 +323,10 @@ function DrawImguiFrame()
   imgui.PushItemWidth(70)
   imgui.safe.BeginCombo( '##Area', read_write_change_bytes_str , function()
     for k, v in pairs(byte_list) do
-      if imgui.Selectable( v.name ) then read_write_change_bytes = v.value; read_write_change_bytes_str = v.name end
+      if imgui.Selectable(k) then
+        read_write_change_bytes = v
+        read_write_change_bytes_str = k
+      end
     end
   end)
   imgui.SameLine()
@@ -279,7 +334,7 @@ function DrawImguiFrame()
   imgui.SameLine()
   if imgui.Button('Write##read-write-change2') then break_point_exec(read_write_change_addr, break_point_label, 'Write', read_write_change_bytes) end
   imgui.SameLine()
-  if imgui.Button('Write Change##read-write-change3') then testt() end
+  if imgui.Button('Write Change##read-write-change2') then break_point_exec_on_write_change(read_write_change_addr, break_point_label, read_write_change_bytes) end
   
   imgui.End()
 end

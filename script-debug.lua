@@ -4,21 +4,6 @@ local breakpoint_list = {}
 local breakpoint_data_list = {}
 local counter = 0
 
-
-function break_point_exec(address, name, type_, bytes)
-  print(string.format('0x%x', address), name, type_, bytes)
-  if address < 1 then return end
-  if address < 0x80000000 then address = address + 0x80000000 end
-  breakpoint_list[counter] = PCSX.addBreakpoint(address, type_, bytes, name, function(address, w, c) PCSX.pauseEmulator() end)
-  counter = counter + 1
-end
-
-function createBreakpointWithArg(address, type_, bytes, name, myArg)
-  return PCSX.addBreakpoint(address, type_, bytes, name, function(address, w, c)
-    PCSX.pauseEmulator()
-  end)
-end
-
 storeOpcodes = {
     [0x28] = 'STORE', -- sb
     [0x29] = 'STORE', -- sh
@@ -27,13 +12,39 @@ storeOpcodes = {
     [0x2e] = 'STORE', -- swr
     [0x3a] = 'STORE', -- swc2
 }
+loadOpcodes = {
+    [0x20] = 'LOAD', -- lb
+    [0x24] = 'LOAD', -- lbu
+    [0x21] = 'LOAD', -- lh
+    [0x25] = 'LOAD', -- lhu
+    [0x23] = 'LOAD', -- lw
+    [0x22] = 'LOAD', -- lwl
+    [0x26] = 'LOAD', -- lwr
+}
+
+function breakpoint(address, name, type_, bytes)
+  if address < 1 then return end
+  if address < 0x80000000 then address = address + 0x80000000 end
+  breakpoint_list[counter] = PCSX.addBreakpoint(address, type_, bytes, name, function(address, w, c) PCSX.pauseEmulator() end)
+  counter = counter + 1
+end
+
 function isStore(code)
-  opcode = bit.rshift(code, 26)
+  local opcode = bit.rshift(code, 26)
   local t = storeOpcodes[opcode]
   if t == nil then
       return false, nil
   end
-  offsett = bit.band(code, 0xffff)
+  local offsett = bit.band(code, 0xffff)
+  return true, offsett
+end
+function isLoad(code)
+  local opcode = bit.rshift(code, 26)
+  local t = loadOpcodes[opcode]
+  if t == nil then
+      return false, nil
+  end
+  local offsett = bit.band(code, 0xffff)
   return true, offsett
 end
 function get_register_value_from_bits(b)
@@ -79,25 +90,63 @@ function get_2_byte_from_memory(address)
   pointer = ffi.cast('uint16_t*', pointer)
   return pointer[0]
 end
-function break_point_exec_on_write_change_fun(address, bytes, label)
-  code = get_4_byte_from_memory(PCSX.getRegisters().pc)
-  isStoreCode, offset = isStore(code)
+function read_value_from_memory(address, bytes)
+  local value = PCSX.getMemPtr()[(address - 0x80000000)]
+  if bytes == 2 then value = get_2_byte_from_memory(address)
+  elseif bytes == 1 then value = get_4_byte_from_memory(address)
+  end
+  return value
+end
+function is_equality_true(mem_value, value, equality)
+  local bool = false
+  if equality == 0 then bool = mem_value == value
+  elseif equality == 1 then bool = mem_value ~= value
+  elseif equality == 2 then bool = mem_value > value
+  elseif equality == 3 then bool = mem_value >= value
+  elseif equality == 4 then bool = mem_value < value
+  elseif equality == 5 then bool = mem_value <= value
+  end
+  return bool
+end
+
+function breakpoint_on_write_change_fun(address, bytes, label)
+  local code = get_4_byte_from_memory(PCSX.getRegisters().pc)
+  local isStoreCode, offset = isStore(code)
   if isStoreCode then
-    address = get_register_value_from_bits(bit.band(bit.rshift(code, 21), 0x1f)) + offset
-    new_value = get_register_value_from_bits(bit.band(bit.rshift(code, 16), 0x1f))
-    
-    local old_value = PCSX.getMemPtr()[(address - 0x80000000)]
-    if bytes == 2 then old_value = get_2_byte_from_memory(address)
-    elseif bytes == 1 then old_value = get_4_byte_from_memory(address)
-    end
+    local address = get_register_value_from_bits(bit.band(bit.rshift(code, 21), 0x1f)) + offset
+    local new_value = get_register_value_from_bits(bit.band(bit.rshift(code, 16), 0x1f))
+    local old_value = read_value_from_memory(address, bytes);
 
     if old_value ~= new_value then
       PCSX.pauseEmulator()
     end
   end
 end
-function break_point_exec_on_write_change(address, name, bytes)
+function breakpoint_on_write_change(address, name, bytes)
+  if address < 1 then return end
+  if address < 0x80000000 then address = address + 0x80000000 end
   breakpoint_list[counter] = PCSX.addBreakpoint(address, 'Write', bytes, name, break_point_exec_on_write_change_fun)
+  counter = counter + 1
+end
+
+function breakpoint_read_write_equality_fun(exe_address, type_, bytes, name, value, equality)
+  return PCSX.addBreakpoint(exe_address, type_, bytes, name, function(address, w, c)
+    local code = get_4_byte_from_memory(PCSX.getRegisters().pc)
+    local bool, offset = isLoad(code)
+    if bool then
+      local address = get_register_value_from_bits(bit.band(bit.rshift(code, 21), 0x1f)) + offset
+      local mem_value = read_value_from_memory(address, bytes)
+
+      if is_equality_true(mem_value, value, equality) then
+        PCSX.pauseEmulator()
+      end
+    end
+  end)
+end
+function breakpoint_read_write_equality(address, type_, bytes, name, value, equality)
+  if address < 1 then return end
+  if address < 0x80000000 then address = address + 0x80000000 end
+  breakpoint_list[counter] = breakpoint_read_write_equality_fun(address, type_, bytes, name, value, equality)
   counter = counter + 1
 end
 
@@ -291,7 +340,7 @@ read_write_change_bytes_str = 'Byte'
 --
 read_write_equality_addr = 0
 read_write_equality_addr_str = '0'
-read_write_equality_equality = 0
+read_write_equality = 0
 read_write_equality_str = '=='
 read_write_equality_bytes = 1
 read_write_equality_bytes_str = 'Byte'
@@ -300,12 +349,12 @@ read_write_equality_addr_val_str = '0'
 function DrawImguiFrame()
   local window = imgui.Begin('Debug Script', true)
   if not window then imgui.End() return end
-    
+
   imgui.TextUnformatted('Name:')
   imgui.SameLine()
   local ccc, bbb = imgui.extra.InputText('##break-point-label', break_point_label)
   if ccc then break_point_label = bbb end
-  
+
   imgui.TextUnformatted('Address:')
   imgui.SameLine()
   imgui.SetNextItemWidth(75)
@@ -318,8 +367,8 @@ function DrawImguiFrame()
     end
   end
   imgui.SameLine()
-  if imgui.Button('Exec##exec') then break_point_exec(exec_addr, break_point_label, 'Exec', 1) end
-  
+  if imgui.Button('Exec##exec') then breakpoint(exec_addr, break_point_label, 'Exec', 1) end
+
   imgui.TextUnformatted('Address:')
   imgui.SameLine()
   imgui.SetNextItemWidth(75)
@@ -342,12 +391,12 @@ function DrawImguiFrame()
     end
   end)
   imgui.SameLine()
-  if imgui.Button('Read##read-write-change1') then break_point_exec(read_write_change_addr, break_point_label, 'Read', read_write_change_bytes) end
+  if imgui.Button('Read##read-write-change1') then breakpoint(read_write_change_addr, break_point_label, 'Read', read_write_change_bytes) end
   imgui.SameLine()
-  if imgui.Button('Write##read-write-change2') then break_point_exec(read_write_change_addr, break_point_label, 'Write', read_write_change_bytes) end
+  if imgui.Button('Write##read-write-change2') then breakpoint(read_write_change_addr, break_point_label, 'Write', read_write_change_bytes) end
   imgui.SameLine()
-  if imgui.Button('Write Change##read-write-change2') then break_point_exec_on_write_change(read_write_change_addr, break_point_label, read_write_change_bytes) end
-  
+  if imgui.Button('Write Change##read-write-change2') then breakpoint_on_write_change(read_write_change_addr, break_point_label, read_write_change_bytes) end
+
   imgui.TextUnformatted('Address:')
   imgui.SameLine()
   imgui.SetNextItemWidth(75)
@@ -370,6 +419,16 @@ function DrawImguiFrame()
     end
   end)
   imgui.SameLine()
+  imgui.PushItemWidth(40)
+  imgui.safe.BeginCombo('##read-write-equality-value-equality', read_write_equality_str , function()
+    for k, v in pairs(equality_list) do
+      if imgui.Selectable(v) then
+        read_write_equality = k
+        read_write_equality_str = v
+      end
+    end
+  end)
+  imgui.SameLine()
   imgui.TextUnformatted('Value:')
   imgui.SameLine()
   imgui.SetNextItemWidth(50)
@@ -382,20 +441,9 @@ function DrawImguiFrame()
     end
   end
   imgui.SameLine()
-  imgui.PushItemWidth(40)
-  imgui.safe.BeginCombo('##read-write-equality-value-equality', read_write_equality_str , function()
-    for k, v in pairs(equality_list) do
-      if imgui.Selectable(v) then
-        read_write_equality = k
-        read_write_equality_str = v
-      end
-    end
-  end)
+  if imgui.Button('Read##read-write-equality1') then breakpoint_read_write_equality(read_write_equality_addr, 'Read', read_write_equality_bytes, break_point_label, read_write_equality_addr_val, read_write_equality) end
   imgui.SameLine()
-  if imgui.Button('Read##read-write-equality1') then print('1') end
-  imgui.SameLine()
-  if imgui.Button('Write##read-write-equality2') then print('2') end
-
+  if imgui.Button('Write##read-write-equality2') then breakpoint_read_write_equality(read_write_equality_addr, 'Write', read_write_equality_bytes, break_point_label, read_write_equality_addr_val, read_write_equality) end
   imgui.End()
 end
 print('Debugging Script is Loaded')

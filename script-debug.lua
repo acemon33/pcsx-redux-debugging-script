@@ -1,7 +1,6 @@
 local bit = require("bit")
 
 local breakpoint_list = {}
-local breakpoint_data_list = {}
 local counter = 0
 
 local storeOpcodes = {
@@ -22,12 +21,14 @@ local loadOpcodes = {
     [0x26] = 'LOAD', -- lwr
 }
 
+local function breakpoint(address, name, type_, bytes)
   if address < 1 then return end
   if address < 0x80000000 then address = address + 0x80000000 end
   breakpoint_list[counter] = PCSX.addBreakpoint(address, type_, bytes, name, function(address, w, c) PCSX.pauseEmulator() end)
   counter = counter + 1
 end
 
+local function isStore(code)
   local opcode = bit.rshift(code, 26)
   local t = storeOpcodes[opcode]
   if t == nil then
@@ -36,6 +37,7 @@ end
   local offsett = bit.band(code, 0xffff)
   return true, offsett
 end
+local function isLoad(code)
   local opcode = bit.rshift(code, 26)
   local t = loadOpcodes[opcode]
   if t == nil then
@@ -44,6 +46,7 @@ end
   local offsett = bit.band(code, 0xffff)
   return true, offsett
 end
+local function get_register_value(register)
   if register == 0x01 then return PCSX.getRegisters().GPR.n.at
   elseif register == 0x02 then return PCSX.getRegisters().GPR.n.v0
   elseif register == 0x03 then return PCSX.getRegisters().GPR.n.v1
@@ -74,22 +77,26 @@ end
   elseif register == 0x1f then return PCSX.getRegisters().GPR.n.ra
   end
 end
+local function get_4_byte_from_memory(address)
   local mem = PCSX.getMemPtr()
   local pointer = mem + address - 0x80000000
   pointer = ffi.cast('uint32_t*', pointer)
   return pointer[0]
 end
+local function get_2_byte_from_memory(address)
   local mem = PCSX.getMemPtr()
   local pointer = mem + address - 0x80000000
   pointer = ffi.cast('uint16_t*', pointer)
   return pointer[0]
 end
+local function read_value_from_memory(address, bytes)
   local value = PCSX.getMemPtr()[(address - 0x80000000)]
   if bytes == 2 then value = get_2_byte_from_memory(address)
   elseif bytes == 1 then value = get_4_byte_from_memory(address)
   end
   return value
 end
+local function is_equality_true(mem_value, value, equality)
   local bool = false
   if equality == 0 then bool = mem_value == value
   elseif equality == 1 then bool = mem_value ~= value
@@ -101,6 +108,7 @@ end
   return bool
 end
 
+local function breakpoint_on_write_change_fun(address, bytes, label)
   local code = get_4_byte_from_memory(PCSX.getRegisters().pc)
   local isStoreCode, offset = isStore(code)
   if isStoreCode then
@@ -113,12 +121,14 @@ end
     end
   end
 end
+local function breakpoint_on_write_change(address, name, bytes)
   if address < 1 then return end
   if address < 0x80000000 then address = address + 0x80000000 end
   breakpoint_list[counter] = PCSX.addBreakpoint(address, 'Write', bytes, name, break_point_exec_on_write_change_fun)
   counter = counter + 1
 end
 
+local function breakpoint_read_write_equality_fun(exe_address, type_, bytes, name, value, equality)
   return PCSX.addBreakpoint(exe_address, type_, bytes, name, function(address, w, c)
     local code = get_4_byte_from_memory(PCSX.getRegisters().pc)
     local bool, offset = isLoad(code)
@@ -132,18 +142,21 @@ end
     end
   end)
 end
+local function breakpoint_read_write_equality(address, type_, bytes, name, value, equality)
   if address < 1 then return end
   if address < 0x80000000 then address = address + 0x80000000 end
   breakpoint_list[counter] = breakpoint_read_write_equality_fun(address, type_, bytes, name, value, equality)
   counter = counter + 1
 end
 
+local function breakpoint_exec_register_equality_fun(exe_address, name, register, equality, value)
   return PCSX.addBreakpoint(exe_address, 'Exec', 4, name, function(address, w, c)
     if is_equality_true(get_register_value(register), value, equality) then
       PCSX.pauseEmulator()
     end
   end)
 end
+local function breakpoint_exec_register_equality(address, name, register, equality, value)
   if address < 1 then return end
   if address < 0x80000000 then address = address + 0x80000000 end
   breakpoint_list[counter] = breakpoint_exec_register_equality_fun(address, name, register, equality, value)
@@ -317,24 +330,26 @@ local exec_register_equality_str = '=='
 local exec_register_equality_val = 0
 local exec_register_equality_val_str = '0'
 local exec_register_equality_hex = true
+
 function DrawImguiFrame()
-  local window = imgui.Begin('Debug Script', true)
-  if not window then imgui.End() return end
+  local bool, value = imgui.Begin('Debug Script', true)
+  if not bool then imgui.End() return end
+  if not value then return end
 
   imgui.TextUnformatted('Label:    ')
   imgui.SameLine()
-  local ccc, bbb = imgui.extra.InputText('##break-point-label', break_point_label)
-  if ccc then break_point_label = bbb end
+  bool, value = imgui.extra.InputText('##break-point-label', break_point_label)
+  if bool then break_point_label = value end
 
   imgui.TextUnformatted('Address:')
   imgui.SameLine()
   imgui.SetNextItemWidth(70)
-  ccc, bbb = imgui.extra.InputText('##exec-address', exec_addr_str)
-  if ccc then
-    ccc = tonumber(bbb, 16)
-    if ccc then
-      exec_addr = ccc
-      exec_addr_str = string.format('%08x', ccc)
+  bool, value = imgui.extra.InputText('##exec-address', exec_addr_str)
+  if bool then
+    bool = tonumber(value, 16)
+    if bool then
+      exec_addr = bool
+      exec_addr_str = string.format('%08x', bool)
     end
   end
   imgui.SameLine()
@@ -343,12 +358,12 @@ function DrawImguiFrame()
   imgui.TextUnformatted('Address:')
   imgui.SameLine()
   imgui.SetNextItemWidth(75)
-  ccc, bbb = imgui.extra.InputText('##read-write-change-address', read_write_change_addr_str)
-  if ccc then
-    ccc = tonumber(bbb, 16)
-    if (ccc) then
-      read_write_change_addr = ccc
-      read_write_change_addr_str = string.format('%08x', ccc)
+  bool, value = imgui.extra.InputText('##read-write-change-address', read_write_change_addr_str)
+  if bool then
+    bool = tonumber(value, 16)
+    if (bool) then
+      read_write_change_addr = bool
+      read_write_change_addr_str = string.format('%08x', bool)
     end
   end
   imgui.SameLine()
@@ -371,12 +386,12 @@ function DrawImguiFrame()
   imgui.TextUnformatted('Address:')
   imgui.SameLine()
   imgui.SetNextItemWidth(75)
-  ccc, bbb = imgui.extra.InputText('##read-write-equality', read_write_equality_addr_str)
-  if ccc then
-    ccc = tonumber(bbb, 16)
-    if (ccc) then
-      read_write_equality_addr = ccc
-      read_write_equality_addr_str = string.format('%08x', ccc)
+  bool, value = imgui.extra.InputText('##read-write-equality', read_write_equality_addr_str)
+  if bool then
+    bool = tonumber(value, 16)
+    if (bool) then
+      read_write_equality_addr = bool
+      read_write_equality_addr_str = string.format('%08x', bool)
     end
   end
   imgui.SameLine()
@@ -402,26 +417,26 @@ function DrawImguiFrame()
   imgui.SameLine()
   imgui.TextUnformatted('Value:')
   imgui.SameLine()
-  ccc, bbb = imgui.Checkbox('Hex##read-write-equality-hex', read_write_equality_hex)
-  if ccc then
-    read_write_equality_hex = bbb
-    if (bbb) then read_write_equality_addr_val_str = string.format('0x%x', read_write_equality_addr_val)
+  bool, value = imgui.Checkbox('Hex##read-write-equality-hex', read_write_equality_hex)
+  if bool then
+    read_write_equality_hex = value
+    if (value) then read_write_equality_addr_val_str = string.format('0x%x', read_write_equality_addr_val)
     else read_write_equality_addr_val_str = string.format('%d', read_write_equality_addr_val) end
   end
   imgui.SameLine()
   imgui.SetNextItemWidth(50)
-  ccc, bbb = imgui.extra.InputText('##read-write-equality-value', read_write_equality_addr_val_str)
-  if ccc then
+  bool, value = imgui.extra.InputText('##read-write-equality-value', read_write_equality_addr_val_str)
+  if bool then
     local base = 10
     local base_format = '%d'
     if read_write_equality_hex then
       base = 16
       base_format = '0x%x'
     end
-    ccc = tonumber(bbb, base)
-    if (ccc) then
-      read_write_equality_addr_val = ccc
-      read_write_equality_addr_val_str = string.format(base_format, ccc)
+    bool = tonumber(value, base)
+    if (bool) then
+      read_write_equality_addr_val = bool
+      read_write_equality_addr_val_str = string.format(base_format, bool)
     end
   end
   imgui.SameLine()
@@ -432,12 +447,12 @@ function DrawImguiFrame()
   imgui.TextUnformatted('Address:')
   imgui.SameLine()
   imgui.SetNextItemWidth(75)
-  ccc, bbb = imgui.extra.InputText('##exec-register-equality-address', exec_register_equality_addr_str)
-  if ccc then
-    ccc = tonumber(bbb, 16)
-    if (ccc) then
-      exec_register_equality_addr = ccc
-      exec_register_equality_addr_str = string.format('%08x', ccc)
+  bool, value = imgui.extra.InputText('##exec-register-equality-address', exec_register_equality_addr_str)
+  if bool then
+    bool = tonumber(value, 16)
+    if (bool) then
+      exec_register_equality_addr = bool
+      exec_register_equality_addr_str = string.format('%08x', bool)
     end
   end
   imgui.SameLine()
@@ -463,26 +478,26 @@ function DrawImguiFrame()
   imgui.SameLine()
   imgui.TextUnformatted('Value:')
   imgui.SameLine()
-  ccc, bbb = imgui.Checkbox('Hex##exec-register-equality-hex', exec_register_equality_hex)
-  if ccc then
-    exec_register_equality_hex = bbb
-    if (bbb) then exec_register_equality_val_str = string.format('0x%x', exec_register_equality_val)
+  bool, value = imgui.Checkbox('Hex##exec-register-equality-hex', exec_register_equality_hex)
+  if bool then
+    exec_register_equality_hex = value
+    if (value) then exec_register_equality_val_str = string.format('0x%x', exec_register_equality_val)
     else exec_register_equality_val_str = string.format('%d', exec_register_equality_val) end
   end
   imgui.SameLine()
   imgui.SetNextItemWidth(50)
-  ccc, bbb = imgui.extra.InputText('##exec-register-equality-value', exec_register_equality_val_str)
-  if ccc then
+  bool, value = imgui.extra.InputText('##exec-register-equality-value', exec_register_equality_val_str)
+  if bool then
     local base = 10
     local base_format = '%d'
     if exec_register_equality_hex then
       base = 16
       base_format = '0x%x'
     end
-    ccc = tonumber(bbb, base)
-    if (ccc) then
-      exec_register_equality_val = ccc
-      exec_register_equality_val_str = string.format(base_format, ccc)
+    bool = tonumber(value, base)
+    if (bool) then
+      exec_register_equality_val = bool
+      exec_register_equality_val_str = string.format(base_format, bool)
     end
   end
   imgui.SameLine()

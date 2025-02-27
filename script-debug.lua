@@ -397,6 +397,10 @@ function DrawImguiFrame()
   imgui.SameLine()
   bool, value = imgui.extra.InputText('##break-point-label', break_point_label)
   if bool then break_point_label = value end
+  if imgui.IsItemHovered() then
+    if imgui.IsMouseDoubleClicked(imgui.constant.MouseButton.Left) then imgui.SetClipboardText(break_point_label) end
+    if imgui.IsMouseDoubleClicked(imgui.constant.MouseButton.Right) then break_point_label = imgui.GetClipboardText() end
+  end
 
   -- 1th Row
   imgui.TextUnformatted('Address:')
@@ -408,6 +412,13 @@ function DrawImguiFrame()
     if bool then
       exec_addr = bool
       exec_addr_str = string.format('%08x', bool)
+    end
+  end
+  if imgui.IsItemHovered() then
+    if imgui.IsMouseDoubleClicked(imgui.constant.MouseButton.Left) then imgui.SetClipboardText(exec_addr_str) end
+    if imgui.IsMouseDoubleClicked(imgui.constant.MouseButton.Right) then
+      exec_addr = tonumber(imgui.GetClipboardText(), 16)
+      exec_addr_str = string.format('%x', exec_addr)
     end
   end
   imgui.SameLine()
@@ -425,6 +436,13 @@ function DrawImguiFrame()
     if (bool) then
       read_write_change_addr = bool
       read_write_change_addr_str = string.format('%08x', bool)
+    end
+  end
+  if imgui.IsItemHovered() then
+    if imgui.IsMouseDoubleClicked(imgui.constant.MouseButton.Left) then imgui.SetClipboardText(read_write_change_addr_str) end
+    if imgui.IsMouseDoubleClicked(imgui.constant.MouseButton.Right) then
+      read_write_change_addr = tonumber(imgui.GetClipboardText(), 16)
+      read_write_change_addr_str = string.format('%x', read_write_change_addr)
     end
   end
   imgui.SameLine()
@@ -460,6 +478,13 @@ function DrawImguiFrame()
     if (bool) then
       read_write_equality_addr = bool
       read_write_equality_addr_str = string.format('%08x', bool)
+    end
+  end
+  if imgui.IsItemHovered() then
+    if imgui.IsMouseDoubleClicked(imgui.constant.MouseButton.Left) then imgui.SetClipboardText(read_write_equality_addr_str) end
+    if imgui.IsMouseDoubleClicked(imgui.constant.MouseButton.Right) then
+      read_write_equality_addr = tonumber(imgui.GetClipboardText(), 16)
+      read_write_equality_addr_str = string.format('%x', read_write_equality_addr)
     end
   end
   imgui.SameLine()
@@ -528,6 +553,13 @@ function DrawImguiFrame()
       exec_register_equality_addr_str = string.format('%08x', bool)
     end
   end
+  if imgui.IsItemHovered() then
+    if imgui.IsMouseDoubleClicked(imgui.constant.MouseButton.Left) then imgui.SetClipboardText(exec_register_equality_addr_str) end
+    if imgui.IsMouseDoubleClicked(imgui.constant.MouseButton.Right) then
+      exec_register_equality_addr = tonumber(imgui.GetClipboardText(), 16)
+      exec_register_equality_addr_str = string.format('%x', exec_register_equality_addr)
+    end
+  end
   imgui.SameLine()
   imgui.PushItemWidth(65)
   imgui.safe.BeginCombo('##exec-register-equality-reg', exec_register_equality_reg_str , function()
@@ -593,6 +625,13 @@ function DrawImguiFrame()
       read_write_pc_addr_str = string.format('%08x', bool)
     end
   end
+  if imgui.IsItemHovered() then
+    if imgui.IsMouseDoubleClicked(imgui.constant.MouseButton.Left) then imgui.SetClipboardText(read_write_pc_addr_str) end
+    if imgui.IsMouseDoubleClicked(imgui.constant.MouseButton.Right) then
+      read_write_pc_addr = tonumber(imgui.GetClipboardText(), 16)
+      read_write_pc_addr_str = string.format('%x', read_write_pc_addr)
+    end
+  end
   imgui.SameLine()
   imgui.PushItemWidth(65)
   imgui.safe.BeginCombo('##read-write-pc-bytes', read_write_pc_bytes_str , function()
@@ -645,6 +684,13 @@ function DrawImguiFrame()
     if (bool) then
       exec_memory_addr = bool
       exec_memory_addr_str = string.format('%08x', bool)
+    end
+  end
+  if imgui.IsItemHovered() then
+    if imgui.IsMouseDoubleClicked(imgui.constant.MouseButton.Left) then imgui.SetClipboardText(exec_memory_addr_str) end
+    if imgui.IsMouseDoubleClicked(imgui.constant.MouseButton.Right) then
+      exec_memory_addr = tonumber(imgui.GetClipboardText(), 16)
+      exec_memory_addr_str = string.format('%x', exec_memory_addr)
     end
   end
   imgui.SameLine()

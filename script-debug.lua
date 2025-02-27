@@ -177,6 +177,21 @@ local function breakpoint_read_write_pc_equality(address, type_, bytes, name, pc
   counter = counter + 1
 end
 
+local function breakpoint_exec_memory_equality_fun(mem_address, bytes, name, value, equality, pc)
+  return PCSX.addBreakpoint(pc, 'Exec', bytes, name, function(address, w, c)
+    local mem_value = read_value_from_memory(mem_address, bytes)
+    if is_equality_true(mem_value, value, equality) then
+      PCSX.pauseEmulator()
+    end
+  end)
+end
+local function breakpoint_exec_memory_equality(address, bytes, name, value, equality, pc)
+  if address < 1 then return end
+  if address < 0x80000000 then address = address + 0x80000000 end
+  breakpoint_list[counter] = breakpoint_exec_memory_equality_fun(address, bytes, name, value, equality, pc)
+  counter = counter + 1
+end
+
 --[[
 local table_what_instruction_access = {}
 function what_ins_access_base(a, n, r)
@@ -353,9 +368,21 @@ local read_write_pc_bytes = 1
 local read_write_pc_bytes_str = 'Byte'
 local read_write_pc_val = 0
 local read_write_pc_val_str = '0'
+--
+local exec_memory_addr = 0
+local exec_memory_addr_str = '0'
+local exec_memory_bytes = 1
+local exec_memory_bytes_str = 'Byte'
+local exec_memory_val = 0
+local exec_memory_val_str = '0'
+local exec_memory_val_hex = false
+local exec_memory_equality = 0
+local exec_memory_equality_str = '=='
+local exec_memory_pc = 0
+local exec_memory_pc_str = '0'
 
 function DrawImguiFrame()
-  local bool, value = imgui.Begin('Debug Script', true)
+  local bool, value = imgui.Begin('Debugging Script', true)
   if not bool then imgui.End() return end
   if not value then return end
 
@@ -444,14 +471,7 @@ function DrawImguiFrame()
   imgui.SameLine()
   imgui.TextUnformatted('Value:')
   imgui.SameLine()
-  bool, value = imgui.Checkbox('Hex##read-write-equality-hex', read_write_equality_hex)
-  if bool then
-    read_write_equality_hex = value
-    if (value) then read_write_equality_addr_val_str = string.format('0x%x', read_write_equality_addr_val)
-    else read_write_equality_addr_val_str = string.format('%d', read_write_equality_addr_val) end
-  end
-  imgui.SameLine()
-  imgui.SetNextItemWidth(60)
+  imgui.SetNextItemWidth(65)
   bool, value = imgui.extra.InputText('##read-write-equality-value', read_write_equality_addr_val_str)
   if bool then
     local base = 10
@@ -465,6 +485,13 @@ function DrawImguiFrame()
       read_write_equality_addr_val = bool
       read_write_equality_addr_val_str = string.format(base_format, bool)
     end
+  end
+  imgui.SameLine()
+  bool, value = imgui.Checkbox('Hex##read-write-equality-hex', read_write_equality_hex)
+  if bool then
+    read_write_equality_hex = value
+    if (value) then read_write_equality_addr_val_str = string.format('0x%x', read_write_equality_addr_val)
+    else read_write_equality_addr_val_str = string.format('%d', read_write_equality_addr_val) end
   end
   imgui.SameLine()
   if imgui.Button('Read##read-write-equality1') then breakpoint_read_write_equality(read_write_equality_addr, 'Read', read_write_equality_bytes, break_point_label, read_write_equality_addr_val, read_write_equality) end
@@ -506,14 +533,7 @@ function DrawImguiFrame()
   imgui.SameLine()
   imgui.TextUnformatted('Value:')
   imgui.SameLine()
-  bool, value = imgui.Checkbox('Hex##exec-register-equality-hex', exec_register_equality_hex)
-  if bool then
-    exec_register_equality_hex = value
-    if (value) then exec_register_equality_val_str = string.format('0x%x', exec_register_equality_val)
-    else exec_register_equality_val_str = string.format('%d', exec_register_equality_val) end
-  end
-  imgui.SameLine()
-  imgui.SetNextItemWidth(60)
+  imgui.SetNextItemWidth(65)
   bool, value = imgui.extra.InputText('##exec-register-equality-value', exec_register_equality_val_str)
   if bool then
     local base = 10
@@ -529,7 +549,17 @@ function DrawImguiFrame()
     end
   end
   imgui.SameLine()
-  if imgui.Button('Exec on Register##exec-register-equality-button') then breakpoint_exec_register_equality(exec_register_equality_addr, break_point_label, exec_register_equality_reg, exec_register_equality, exec_register_equality_val) end
+  bool, value = imgui.Checkbox('Hex##exec-register-equality-hex', exec_register_equality_hex)
+  if bool then
+    exec_register_equality_hex = value
+    if (value) then exec_register_equality_val_str = string.format('0x%x', exec_register_equality_val)
+    else exec_register_equality_val_str = string.format('%d', exec_register_equality_val) end
+  end
+  imgui.SameLine()
+  if imgui.Button('Exec##exec-register-equality-button') then breakpoint_exec_register_equality(exec_register_equality_addr, break_point_label, exec_register_equality_reg, exec_register_equality, exec_register_equality_val) end
+
+  imgui.TextUnformatted('Address:')
+  imgui.TextUnformatted('Address:')
 
   -- 7th Row
   imgui.TextUnformatted('Address:')
@@ -580,6 +610,78 @@ function DrawImguiFrame()
   if imgui.Button('Read##read-write-pc-1') then breakpoint_read_write_pc_equality(read_write_pc_addr, 'Read', read_write_pc_bytes, break_point_label, read_write_pc_val, read_write_pc_equality) end
   imgui.SameLine()
   if imgui.Button('Write##read-write-pc-2') then breakpoint_read_write_pc_equality(read_write_pc_addr, 'Write', read_write_pc_bytes, break_point_label, read_write_pc_val, read_write_pc_equality) end
+
+  -- 8th Row
+  imgui.TextUnformatted('Address:')
+  imgui.SameLine()
+  imgui.SetNextItemWidth(75)
+  bool, value = imgui.extra.InputText('##exec-memory-address', exec_memory_addr_str)
+  if bool then
+    bool = tonumber(value, 16)
+    if (bool) then
+      exec_memory_addr = bool
+      exec_memory_addr_str = string.format('%08x', bool)
+    end
+  end
+  imgui.SameLine()
+  imgui.PushItemWidth(65)
+  imgui.safe.BeginCombo('##exec-memroy-bytes', exec_memory_bytes_str , function()
+    for k, v in pairs(byte_list) do
+      if imgui.Selectable(v.name) then
+        exec_memory_bytes = v.value
+        exec_memory_bytes_str = v.name
+      end
+    end
+  end)
+  imgui.SameLine()
+  imgui.PushItemWidth(40)
+  imgui.safe.BeginCombo('##exec-memroy-equality', exec_memory_equality_str , function()
+    for k, v in pairs(equality_list) do
+      if imgui.Selectable(v.name) then
+        exec_memory_equality = v.value
+        exec_memory_equality_str = v.name
+      end
+    end
+  end)
+  imgui.SameLine()
+  imgui.TextUnformatted('Value:')
+  imgui.SameLine()
+  imgui.SetNextItemWidth(65)
+  bool, value = imgui.extra.InputText('##exec-memory-value', exec_memory_val_str)
+  if bool then
+    local base = 10
+    local base_format = '%d'
+    if exec_memory_val_hex then
+      base = 16
+      base_format = '0x%x'
+    end
+    bool = tonumber(value, base)
+    if (bool) then
+      exec_memory_val = bool
+      exec_memory_val_str = string.format(base_format, bool)
+    end
+  end
+  imgui.SameLine()
+  bool, value = imgui.Checkbox('Hex##exec-memroy-hex', exec_memory_val_hex)
+  if bool then
+    exec_memory_val_hex = value
+    if (value) then exec_memory_val_str = string.format('0x%x', exec_memory_val)
+    else exec_memory_val_str = string.format('%d', exec_memory_val) end
+  end
+  imgui.SameLine()
+  imgui.TextUnformatted('PC:')
+  imgui.SameLine()
+  imgui.SetNextItemWidth(60)
+  bool, value = imgui.extra.InputText('##exec-memory-pc', exec_memory_pc_str)
+  if bool then
+    bool = tonumber(value, 16)
+    if (bool) then
+      exec_memory_pc = bool
+      exec_memory_pc_str = string.format('%x', bool)
+    end
+  end
+  imgui.SameLine()
+  if imgui.Button('Exec##exec-memory-button') then breakpoint_exec_memory_equality(exec_memory_addr, exec_memory_bytes, break_point_label, exec_memory_val, exec_memory_equality, exec_memory_pc) end
 
   imgui.End()
 end

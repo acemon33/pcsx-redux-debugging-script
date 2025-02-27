@@ -417,8 +417,11 @@ function DrawImguiFrame()
   if imgui.IsItemHovered() then
     if imgui.IsMouseDoubleClicked(imgui.constant.MouseButton.Left) then imgui.SetClipboardText(exec_addr_str) end
     if imgui.IsMouseDoubleClicked(imgui.constant.MouseButton.Right) then
-      exec_addr = tonumber(imgui.GetClipboardText(), 16)
-      exec_addr_str = string.format('%x', exec_addr)
+      value = tonumber(imgui.GetClipboardText(), 16)
+      if value then
+        exec_addr = value
+        exec_addr_str = string.format('%x', exec_addr)
+      end
     end
   end
   imgui.SameLine()
@@ -441,8 +444,11 @@ function DrawImguiFrame()
   if imgui.IsItemHovered() then
     if imgui.IsMouseDoubleClicked(imgui.constant.MouseButton.Left) then imgui.SetClipboardText(read_write_change_addr_str) end
     if imgui.IsMouseDoubleClicked(imgui.constant.MouseButton.Right) then
-      read_write_change_addr = tonumber(imgui.GetClipboardText(), 16)
-      read_write_change_addr_str = string.format('%x', read_write_change_addr)
+      value = tonumber(imgui.GetClipboardText(), 16)
+      if value then
+        read_write_change_addr = value
+        read_write_change_addr_str = string.format('%x', read_write_change_addr)
+      end
     end
   end
   imgui.SameLine()
@@ -483,8 +489,11 @@ function DrawImguiFrame()
   if imgui.IsItemHovered() then
     if imgui.IsMouseDoubleClicked(imgui.constant.MouseButton.Left) then imgui.SetClipboardText(read_write_equality_addr_str) end
     if imgui.IsMouseDoubleClicked(imgui.constant.MouseButton.Right) then
-      read_write_equality_addr = tonumber(imgui.GetClipboardText(), 16)
-      read_write_equality_addr_str = string.format('%x', read_write_equality_addr)
+      value = tonumber(imgui.GetClipboardText(), 16)
+      if value then
+        read_write_equality_addr = value
+        read_write_equality_addr_str = string.format('%x', read_write_equality_addr)
+      end
     end
   end
   imgui.SameLine()
@@ -525,6 +534,22 @@ function DrawImguiFrame()
       read_write_equality_addr_val_str = string.format(base_format, bool)
     end
   end
+  if imgui.IsItemHovered() then
+    if imgui.IsMouseDoubleClicked(imgui.constant.MouseButton.Left) then imgui.SetClipboardText(read_write_equality_addr_val_str) end
+    if imgui.IsMouseDoubleClicked(imgui.constant.MouseButton.Right) then
+      local base = 10
+      local base_format = '%d'
+      if read_write_equality_hex then
+        base = 16
+        base_format = '0x%x'
+      end
+      value = tonumber(imgui.GetClipboardText(), base)
+      if value then
+        read_write_equality_addr_val = value
+        read_write_equality_addr_val_str = string.format(base_format, read_write_equality_addr_val)
+      end
+    end
+  end
   imgui.SameLine()
   bool, value = imgui.Checkbox('Hex##read-write-equality-hex', read_write_equality_hex)
   if bool then
@@ -556,8 +581,11 @@ function DrawImguiFrame()
   if imgui.IsItemHovered() then
     if imgui.IsMouseDoubleClicked(imgui.constant.MouseButton.Left) then imgui.SetClipboardText(exec_register_equality_addr_str) end
     if imgui.IsMouseDoubleClicked(imgui.constant.MouseButton.Right) then
-      exec_register_equality_addr = tonumber(imgui.GetClipboardText(), 16)
-      exec_register_equality_addr_str = string.format('%x', exec_register_equality_addr)
+      value = tonumber(imgui.GetClipboardText(), 16)
+      if value then
+        exec_register_equality_addr = value
+        exec_register_equality_addr_str = string.format('%x', exec_register_equality_addr)
+      end
     end
   end
   imgui.SameLine()
@@ -598,6 +626,22 @@ function DrawImguiFrame()
       exec_register_equality_val_str = string.format(base_format, bool)
     end
   end
+  if imgui.IsItemHovered() then
+    if imgui.IsMouseDoubleClicked(imgui.constant.MouseButton.Left) then imgui.SetClipboardText(exec_register_equality_val_str) end
+    if imgui.IsMouseDoubleClicked(imgui.constant.MouseButton.Right) then
+      local base = 10
+      local base_format = '%d'
+      if exec_register_equality_hex then
+        base = 16
+        base_format = '0x%x'
+      end
+      value = tonumber(imgui.GetClipboardText(), base)
+      if value then
+        exec_register_equality_val = value
+        exec_register_equality_val_str = string.format(base_format, exec_register_equality_val)
+      end
+    end
+  end
   imgui.SameLine()
   bool, value = imgui.Checkbox('Hex##exec-register-equality-hex', exec_register_equality_hex)
   if bool then
@@ -628,8 +672,11 @@ function DrawImguiFrame()
   if imgui.IsItemHovered() then
     if imgui.IsMouseDoubleClicked(imgui.constant.MouseButton.Left) then imgui.SetClipboardText(read_write_pc_addr_str) end
     if imgui.IsMouseDoubleClicked(imgui.constant.MouseButton.Right) then
-      read_write_pc_addr = tonumber(imgui.GetClipboardText(), 16)
-      read_write_pc_addr_str = string.format('%x', read_write_pc_addr)
+      value = tonumber(imgui.GetClipboardText(), 16)
+      if value then
+        read_write_pc_addr = value
+        read_write_pc_addr_str = string.format('%x', read_write_pc_addr)
+      end
     end
   end
   imgui.SameLine()
@@ -643,7 +690,7 @@ function DrawImguiFrame()
     end
   end)
   imgui.SameLine()
-  imgui.TextUnformatted('PC:')
+  imgui.TextUnformatted('PC:') -- todo: cp
   imgui.SameLine()
   imgui.SetNextItemWidth(60)
   bool, value = imgui.extra.InputText('##read-write-pc-value', read_write_pc_val_str)
@@ -689,8 +736,11 @@ function DrawImguiFrame()
   if imgui.IsItemHovered() then
     if imgui.IsMouseDoubleClicked(imgui.constant.MouseButton.Left) then imgui.SetClipboardText(exec_memory_addr_str) end
     if imgui.IsMouseDoubleClicked(imgui.constant.MouseButton.Right) then
-      exec_memory_addr = tonumber(imgui.GetClipboardText(), 16)
-      exec_memory_addr_str = string.format('%x', exec_memory_addr)
+      value = tonumber(imgui.GetClipboardText(), 16)
+      if value then
+        exec_memory_addr = value
+        exec_memory_addr_str = string.format('%x', exec_memory_addr)
+      end
     end
   end
   imgui.SameLine()
@@ -731,6 +781,22 @@ function DrawImguiFrame()
       exec_memory_val_str = string.format(base_format, bool)
     end
   end
+  if imgui.IsItemHovered() then
+    if imgui.IsMouseDoubleClicked(imgui.constant.MouseButton.Left) then imgui.SetClipboardText(exec_memory_val_str) end
+    if imgui.IsMouseDoubleClicked(imgui.constant.MouseButton.Right) then
+      local base = 10
+      local base_format = '%d'
+      if exec_memory_val_hex then
+        base = 16
+        base_format = '0x%x'
+      end
+      value = tonumber(imgui.GetClipboardText(), base)
+      if value then
+        exec_memory_val = value
+        exec_memory_val_str = string.format(base_format, exec_memory_val)
+      end
+    end
+  end
   imgui.SameLine()
   bool, value = imgui.Checkbox('Hex##exec-memroy-hex', exec_memory_val_hex)
   if bool then
@@ -748,6 +814,16 @@ function DrawImguiFrame()
     if (bool) then
       exec_memory_pc = bool
       exec_memory_pc_str = string.format('%x', bool)
+    end
+  end
+  if imgui.IsItemHovered() then
+    if imgui.IsMouseDoubleClicked(imgui.constant.MouseButton.Left) then imgui.SetClipboardText(exec_memory_pc_str) end
+    if imgui.IsMouseDoubleClicked(imgui.constant.MouseButton.Right) then
+      value = tonumber(imgui.GetClipboardText(), 16)
+      if value then
+        endexec_memory_pc = value
+        exec_memory_pc_str = string.format('%x', exec_memory_pc)
+      end
     end
   end
   imgui.SameLine()

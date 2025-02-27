@@ -425,9 +425,11 @@ function DrawImguiFrame()
     end
   end
   imgui.SameLine()
+  imgui.PushStyleVar(imgui.constant.StyleVar.FrameRounding, 3)
   imgui.PushStyleColor(imgui.constant.Col.Button, color.orange)
-  if imgui.Button('Exec##exec-button') then breakpoint(exec_addr, break_point_label, 'Exec', 1) end
+  if imgui.Button('Exec##exec-button', 70, 22) then breakpoint(exec_addr, break_point_label, 'Exec', 1) end
   imgui.PopStyleColor()
+  imgui.PopStyleVar()
 
   -- 2nd Row
   imgui.TextUnformatted('Address:')
@@ -462,17 +464,23 @@ function DrawImguiFrame()
     end
   end)
   imgui.SameLine()
+  imgui.PushStyleVar(imgui.constant.StyleVar.FrameRounding, 3)
   imgui.PushStyleColor(imgui.constant.Col.Button, color.blue)
-  if imgui.Button('Read##read-write-change1-button') then breakpoint(read_write_change_addr, break_point_label, 'Read', read_write_change_bytes) end
+  if imgui.Button('Read##read-write-change1-button', 70, 22) then breakpoint(read_write_change_addr, break_point_label, 'Read', read_write_change_bytes) end
   imgui.PopStyleColor()
+  imgui.PopStyleVar()
   imgui.SameLine()
+  imgui.PushStyleVar(imgui.constant.StyleVar.FrameRounding, 3)
   imgui.PushStyleColor(imgui.constant.Col.Button, color.green)
-  if imgui.Button('Write##read-write-change2-button') then breakpoint(read_write_change_addr, break_point_label, 'Write', read_write_change_bytes) end
+  if imgui.Button('Write##read-write-change2-button', 70, 22) then breakpoint(read_write_change_addr, break_point_label, 'Write', read_write_change_bytes) end
   imgui.PopStyleColor()
+  imgui.PopStyleVar()
   imgui.SameLine()
+  imgui.PushStyleVar(imgui.constant.StyleVar.FrameRounding, 3)
   imgui.PushStyleColor(imgui.constant.Col.Button, color.green)
-  if imgui.Button('Write on Change##read-write-change2-button') then breakpoint_on_write_change(read_write_change_addr, break_point_label, read_write_change_bytes) end
+  if imgui.Button('Write on Change##read-write-change2-button', 100, 22) then breakpoint_on_write_change(read_write_change_addr, break_point_label, read_write_change_bytes) end
   imgui.PopStyleColor()
+  imgui.PopStyleVar()
 
   -- 3rd Row
   imgui.TextUnformatted('Address:')
@@ -558,13 +566,17 @@ function DrawImguiFrame()
     else read_write_equality_addr_val_str = string.format('%d', read_write_equality_addr_val) end
   end
   imgui.SameLine()
+  imgui.PushStyleVar(imgui.constant.StyleVar.FrameRounding, 3)
   imgui.PushStyleColor(imgui.constant.Col.Button, color.blue)
-  if imgui.Button('Read##read-write-equality1-button') then breakpoint_read_write_equality(read_write_equality_addr, 'Read', read_write_equality_bytes, break_point_label, read_write_equality_addr_val, read_write_equality) end
+  if imgui.Button('Read##read-write-equality1-button', 70, 22) then breakpoint_read_write_equality(read_write_equality_addr, 'Read', read_write_equality_bytes, break_point_label, read_write_equality_addr_val, read_write_equality) end
   imgui.PopStyleColor()
+  imgui.PopStyleVar()
   imgui.SameLine()
+  imgui.PushStyleVar(imgui.constant.StyleVar.FrameRounding, 3)
   imgui.PushStyleColor(imgui.constant.Col.Button, color.green)
-  if imgui.Button('Write##read-write-equality2-button') then breakpoint_read_write_equality(read_write_equality_addr, 'Write', read_write_equality_bytes, break_point_label, read_write_equality_addr_val, read_write_equality) end
+  if imgui.Button('Write##read-write-equality2-button', 70, 22) then breakpoint_read_write_equality(read_write_equality_addr, 'Write', read_write_equality_bytes, break_point_label, read_write_equality_addr_val, read_write_equality) end
   imgui.PopStyleColor()
+  imgui.PopStyleVar()
 
   -- 4th Row
   imgui.TextUnformatted('Address:')
@@ -650,9 +662,11 @@ function DrawImguiFrame()
     else exec_register_equality_val_str = string.format('%d', exec_register_equality_val) end
   end
   imgui.SameLine()
+  imgui.PushStyleVar(imgui.constant.StyleVar.FrameRounding, 3)
   imgui.PushStyleColor(imgui.constant.Col.Button, color.orange)
-  if imgui.Button('Exec##exec-register-equality-button') then breakpoint_exec_register_equality(exec_register_equality_addr, break_point_label, exec_register_equality_reg, exec_register_equality, exec_register_equality_val) end
+  if imgui.Button('Exec##exec-register-equality-button', 70, 22) then breakpoint_exec_register_equality(exec_register_equality_addr, break_point_label, exec_register_equality_reg, exec_register_equality, exec_register_equality_val) end
   imgui.PopStyleColor()
+  imgui.PopStyleVar()
 
   imgui.TextUnformatted('Address:')
   imgui.TextUnformatted('Address:')
@@ -713,13 +727,17 @@ function DrawImguiFrame()
     end
   end)
   imgui.SameLine()
+  imgui.PushStyleVar(imgui.constant.StyleVar.FrameRounding, 3)
   imgui.PushStyleColor(imgui.constant.Col.Button, color.blue)
-  if imgui.Button('Read##read-write-pc-1-button') then breakpoint_read_write_pc_equality(read_write_pc_addr, 'Read', read_write_pc_bytes, break_point_label, read_write_pc_val, read_write_pc_equality) end
+  if imgui.Button('Read##read-write-pc-1-button', 70, 22) then breakpoint_read_write_pc_equality(read_write_pc_addr, 'Read', read_write_pc_bytes, break_point_label, read_write_pc_val, read_write_pc_equality) end
   imgui.PopStyleColor()
+  imgui.PopStyleVar()
   imgui.SameLine()
+  imgui.PushStyleVar(imgui.constant.StyleVar.FrameRounding, 3)
   imgui.PushStyleColor(imgui.constant.Col.Button, color.green)
-  if imgui.Button('Write##read-write-pc-2-button') then breakpoint_read_write_pc_equality(read_write_pc_addr, 'Write', read_write_pc_bytes, break_point_label, read_write_pc_val, read_write_pc_equality) end
+  if imgui.Button('Write##read-write-pc-2-button', 70, 22) then breakpoint_read_write_pc_equality(read_write_pc_addr, 'Write', read_write_pc_bytes, break_point_label, read_write_pc_val, read_write_pc_equality) end
   imgui.PopStyleColor()
+  imgui.PopStyleVar()
 
   -- 8th Row
   imgui.TextUnformatted('Address:')
@@ -827,9 +845,11 @@ function DrawImguiFrame()
     end
   end
   imgui.SameLine()
+  imgui.PushStyleVar(imgui.constant.StyleVar.FrameRounding, 3)
   imgui.PushStyleColor(imgui.constant.Col.Button, color.orange)
-  if imgui.Button('Exec##exec-memory-button') then breakpoint_exec_memory_equality(exec_memory_addr, exec_memory_bytes, break_point_label, exec_memory_val, exec_memory_equality, exec_memory_pc) end
+  if imgui.Button('Exec##exec-memory-button', 70, 22) then breakpoint_exec_memory_equality(exec_memory_addr, exec_memory_bytes, break_point_label, exec_memory_val, exec_memory_equality, exec_memory_pc) end
   imgui.PopStyleColor()
+  imgui.PopStyleVar()
 
   imgui.End()
 end

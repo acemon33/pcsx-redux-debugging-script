@@ -124,7 +124,7 @@ end
 local function breakpoint_on_write_change(address, name, bytes)
   if address < 1 then return end
   if address < 0x80000000 then address = address + 0x80000000 end
-  breakpoint_list[counter] = PCSX.addBreakpoint(address, 'Write', bytes, name, break_point_exec_on_write_change_fun)
+  breakpoint_list[counter] = PCSX.addBreakpoint(address, 'Write', bytes, name, breakpoint_on_write_change_fun)
   counter = counter + 1
 end
 
@@ -160,6 +160,20 @@ local function breakpoint_exec_register_equality(address, name, register, equali
   if address < 1 then return end
   if address < 0x80000000 then address = address + 0x80000000 end
   breakpoint_list[counter] = breakpoint_exec_register_equality_fun(address, name, register, equality, value)
+  counter = counter + 1
+end
+
+local function breakpoint_read_write_pc_equality_fun(exe_address, type_, bytes, name, pc, equality)
+  return PCSX.addBreakpoint(exe_address, type_, bytes, name, function(address, w, c)
+    if is_equality_true(PCSX.getRegisters().pc, pc, equality) then
+      PCSX.pauseEmulator()
+    end
+  end)
+end
+local function breakpoint_read_write_pc_equality(address, type_, bytes, name, pc, equality)
+  if address < 1 then return end
+  if address < 0x80000000 then address = address + 0x80000000 end
+  breakpoint_list[counter] = breakpoint_read_write_pc_equality_fun(address, type_, bytes, name, pc, equality)
   counter = counter + 1
 end
 
@@ -330,20 +344,31 @@ local exec_register_equality_str = '=='
 local exec_register_equality_val = 0
 local exec_register_equality_val_str = '0'
 local exec_register_equality_hex = true
+--
+local read_write_pc_addr = 0
+local read_write_pc_addr_str = '0'
+local read_write_pc_equality = 0
+local read_write_pc_equality_str = '=='
+local read_write_pc_bytes = 1
+local read_write_pc_bytes_str = 'Byte'
+local read_write_pc_val = 0
+local read_write_pc_val_str = '0'
 
 function DrawImguiFrame()
   local bool, value = imgui.Begin('Debug Script', true)
   if not bool then imgui.End() return end
   if not value then return end
 
+  -- 0th Row
   imgui.TextUnformatted('Label:    ')
   imgui.SameLine()
   bool, value = imgui.extra.InputText('##break-point-label', break_point_label)
   if bool then break_point_label = value end
 
+  -- 1th Row
   imgui.TextUnformatted('Address:')
   imgui.SameLine()
-  imgui.SetNextItemWidth(70)
+  imgui.SetNextItemWidth(75)
   bool, value = imgui.extra.InputText('##exec-address', exec_addr_str)
   if bool then
     bool = tonumber(value, 16)
@@ -355,6 +380,7 @@ function DrawImguiFrame()
   imgui.SameLine()
   if imgui.Button('Exec##exec') then breakpoint(exec_addr, break_point_label, 'Exec', 1) end
 
+  -- 2nd Row
   imgui.TextUnformatted('Address:')
   imgui.SameLine()
   imgui.SetNextItemWidth(75)
@@ -383,6 +409,7 @@ function DrawImguiFrame()
   imgui.SameLine()
   if imgui.Button('Write Change##read-write-change2') then breakpoint_on_write_change(read_write_change_addr, break_point_label, read_write_change_bytes) end
 
+  -- 3rd Row
   imgui.TextUnformatted('Address:')
   imgui.SameLine()
   imgui.SetNextItemWidth(75)
@@ -424,7 +451,7 @@ function DrawImguiFrame()
     else read_write_equality_addr_val_str = string.format('%d', read_write_equality_addr_val) end
   end
   imgui.SameLine()
-  imgui.SetNextItemWidth(50)
+  imgui.SetNextItemWidth(60)
   bool, value = imgui.extra.InputText('##read-write-equality-value', read_write_equality_addr_val_str)
   if bool then
     local base = 10
@@ -444,6 +471,7 @@ function DrawImguiFrame()
   imgui.SameLine()
   if imgui.Button('Write##read-write-equality2') then breakpoint_read_write_equality(read_write_equality_addr, 'Write', read_write_equality_bytes, break_point_label, read_write_equality_addr_val, read_write_equality) end
 
+  -- 4th Row
   imgui.TextUnformatted('Address:')
   imgui.SameLine()
   imgui.SetNextItemWidth(75)
@@ -485,7 +513,7 @@ function DrawImguiFrame()
     else exec_register_equality_val_str = string.format('%d', exec_register_equality_val) end
   end
   imgui.SameLine()
-  imgui.SetNextItemWidth(50)
+  imgui.SetNextItemWidth(60)
   bool, value = imgui.extra.InputText('##exec-register-equality-value', exec_register_equality_val_str)
   if bool then
     local base = 10
@@ -502,6 +530,56 @@ function DrawImguiFrame()
   end
   imgui.SameLine()
   if imgui.Button('Exec on Register##exec-register-equality-button') then breakpoint_exec_register_equality(exec_register_equality_addr, break_point_label, exec_register_equality_reg, exec_register_equality, exec_register_equality_val) end
+
+  -- 7th Row
+  imgui.TextUnformatted('Address:')
+  imgui.SameLine()
+  imgui.SetNextItemWidth(75)
+  bool, value = imgui.extra.InputText('##read-write-pc', read_write_pc_addr_str)
+  if bool then
+    bool = tonumber(value, 16)
+    if (bool) then
+      read_write_pc_addr = bool
+      read_write_pc_addr_str = string.format('%08x', bool)
+    end
+  end
+  imgui.SameLine()
+  imgui.PushItemWidth(65)
+  imgui.safe.BeginCombo('##read-write-pc-bytes', read_write_pc_bytes_str , function()
+    for k, v in pairs(byte_list) do
+      if imgui.Selectable(v.name) then
+        read_write_pc_bytes = v.value
+        read_write_pc_bytes_str = v.name
+      end
+    end
+  end)
+  imgui.SameLine()
+  imgui.TextUnformatted('PC:')
+  imgui.SameLine()
+  imgui.SetNextItemWidth(60)
+  bool, value = imgui.extra.InputText('##read-write-pc-value', read_write_pc_val_str)
+  if bool then
+    bool = tonumber(value, 16)
+    if (bool) then
+      read_write_pc_val = bool
+      read_write_pc_val_str = string.format('%x', bool)
+    end
+  end
+  imgui.SameLine()
+  imgui.PushItemWidth(40)
+  imgui.safe.BeginCombo('##read-write-pc-value-equality', read_write_pc_equality_str , function()
+    for k, v in pairs(equality_list) do
+      if imgui.Selectable(v.name) then
+        read_write_pc_equality = v.value
+        read_write_pc_equality_str = v.name
+      end
+      if v.value == 1 then break end
+    end
+  end)
+  imgui.SameLine()
+  if imgui.Button('Read##read-write-pc-1') then breakpoint_read_write_pc_equality(read_write_pc_addr, 'Read', read_write_pc_bytes, break_point_label, read_write_pc_val, read_write_pc_equality) end
+  imgui.SameLine()
+  if imgui.Button('Write##read-write-pc-2') then breakpoint_read_write_pc_equality(read_write_pc_addr, 'Write', read_write_pc_bytes, break_point_label, read_write_pc_val, read_write_pc_equality) end
 
   imgui.End()
 end

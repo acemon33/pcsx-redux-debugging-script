@@ -22,14 +22,12 @@ local loadOpcodes = {
     [0x26] = 'LOAD', -- lwr
 }
 
-function breakpoint(address, name, type_, bytes)
   if address < 1 then return end
   if address < 0x80000000 then address = address + 0x80000000 end
   breakpoint_list[counter] = PCSX.addBreakpoint(address, type_, bytes, name, function(address, w, c) PCSX.pauseEmulator() end)
   counter = counter + 1
 end
 
-function isStore(code)
   local opcode = bit.rshift(code, 26)
   local t = storeOpcodes[opcode]
   if t == nil then
@@ -38,7 +36,6 @@ function isStore(code)
   local offsett = bit.band(code, 0xffff)
   return true, offsett
 end
-function isLoad(code)
   local opcode = bit.rshift(code, 26)
   local t = loadOpcodes[opcode]
   if t == nil then
@@ -47,7 +44,6 @@ function isLoad(code)
   local offsett = bit.band(code, 0xffff)
   return true, offsett
 end
-function get_register_value(register)
   if register == 0x01 then return PCSX.getRegisters().GPR.n.at
   elseif register == 0x02 then return PCSX.getRegisters().GPR.n.v0
   elseif register == 0x03 then return PCSX.getRegisters().GPR.n.v1
@@ -78,26 +74,22 @@ function get_register_value(register)
   elseif register == 0x1f then return PCSX.getRegisters().GPR.n.ra
   end
 end
-function get_4_byte_from_memory(address)
   local mem = PCSX.getMemPtr()
   local pointer = mem + address - 0x80000000
   pointer = ffi.cast('uint32_t*', pointer)
   return pointer[0]
 end
-function get_2_byte_from_memory(address)
   local mem = PCSX.getMemPtr()
   local pointer = mem + address - 0x80000000
   pointer = ffi.cast('uint16_t*', pointer)
   return pointer[0]
 end
-function read_value_from_memory(address, bytes)
   local value = PCSX.getMemPtr()[(address - 0x80000000)]
   if bytes == 2 then value = get_2_byte_from_memory(address)
   elseif bytes == 1 then value = get_4_byte_from_memory(address)
   end
   return value
 end
-function is_equality_true(mem_value, value, equality)
   local bool = false
   if equality == 0 then bool = mem_value == value
   elseif equality == 1 then bool = mem_value ~= value
@@ -109,7 +101,6 @@ function is_equality_true(mem_value, value, equality)
   return bool
 end
 
-function breakpoint_on_write_change_fun(address, bytes, label)
   local code = get_4_byte_from_memory(PCSX.getRegisters().pc)
   local isStoreCode, offset = isStore(code)
   if isStoreCode then
@@ -122,14 +113,12 @@ function breakpoint_on_write_change_fun(address, bytes, label)
     end
   end
 end
-function breakpoint_on_write_change(address, name, bytes)
   if address < 1 then return end
   if address < 0x80000000 then address = address + 0x80000000 end
   breakpoint_list[counter] = PCSX.addBreakpoint(address, 'Write', bytes, name, break_point_exec_on_write_change_fun)
   counter = counter + 1
 end
 
-function breakpoint_read_write_equality_fun(exe_address, type_, bytes, name, value, equality)
   return PCSX.addBreakpoint(exe_address, type_, bytes, name, function(address, w, c)
     local code = get_4_byte_from_memory(PCSX.getRegisters().pc)
     local bool, offset = isLoad(code)
@@ -143,21 +132,18 @@ function breakpoint_read_write_equality_fun(exe_address, type_, bytes, name, val
     end
   end)
 end
-function breakpoint_read_write_equality(address, type_, bytes, name, value, equality)
   if address < 1 then return end
   if address < 0x80000000 then address = address + 0x80000000 end
   breakpoint_list[counter] = breakpoint_read_write_equality_fun(address, type_, bytes, name, value, equality)
   counter = counter + 1
 end
 
-function breakpoint_exec_register_equality_fun(exe_address, name, register, equality, value)
   return PCSX.addBreakpoint(exe_address, 'Exec', 4, name, function(address, w, c)
     if is_equality_true(get_register_value(register), value, equality) then
       PCSX.pauseEmulator()
     end
   end)
 end
-function breakpoint_exec_register_equality(address, name, register, equality, value)
   if address < 1 then return end
   if address < 0x80000000 then address = address + 0x80000000 end
   breakpoint_list[counter] = breakpoint_exec_register_equality_fun(address, name, register, equality, value)
@@ -262,7 +248,6 @@ local ji = ''
 local ji2 = 1
 ]]
 
-
 local break_point_label = ''
 local byte_list = {
   { name = 'Byte'   , value = 1 },
@@ -321,6 +306,7 @@ local read_write_equality_bytes = 1
 local read_write_equality_bytes_str = 'Byte'
 local read_write_equality_addr_val = 0
 local read_write_equality_addr_val_str = '0'
+local read_write_equality_hex = false
 --
 local exec_register_equality_addr = 0
 local exec_register_equality_addr_str = ''
@@ -330,6 +316,7 @@ local exec_register_equality = 0
 local exec_register_equality_str = '=='
 local exec_register_equality_val = 0
 local exec_register_equality_val_str = '0'
+local exec_register_equality_hex = true
 function DrawImguiFrame()
   local window = imgui.Begin('Debug Script', true)
   if not window then imgui.End() return end
@@ -415,13 +402,26 @@ function DrawImguiFrame()
   imgui.SameLine()
   imgui.TextUnformatted('Value:')
   imgui.SameLine()
+  ccc, bbb = imgui.Checkbox('Hex##read-write-equality-hex', read_write_equality_hex)
+  if ccc then
+    read_write_equality_hex = bbb
+    if (bbb) then read_write_equality_addr_val_str = string.format('0x%x', read_write_equality_addr_val)
+    else read_write_equality_addr_val_str = string.format('%d', read_write_equality_addr_val) end
+  end
+  imgui.SameLine()
   imgui.SetNextItemWidth(50)
   ccc, bbb = imgui.extra.InputText('##read-write-equality-value', read_write_equality_addr_val_str)
   if ccc then
-    ccc = tonumber(bbb)
+    local base = 10
+    local base_format = '%d'
+    if read_write_equality_hex then
+      base = 16
+      base_format = '0x%x'
+    end
+    ccc = tonumber(bbb, base)
     if (ccc) then
       read_write_equality_addr_val = ccc
-      read_write_equality_addr_val_str = string.format('%d', ccc)
+      read_write_equality_addr_val_str = string.format(base_format, ccc)
     end
   end
   imgui.SameLine()
@@ -463,13 +463,26 @@ function DrawImguiFrame()
   imgui.SameLine()
   imgui.TextUnformatted('Value:')
   imgui.SameLine()
+  ccc, bbb = imgui.Checkbox('Hex##exec-register-equality-hex', exec_register_equality_hex)
+  if ccc then
+    exec_register_equality_hex = bbb
+    if (bbb) then exec_register_equality_val_str = string.format('0x%x', exec_register_equality_val)
+    else exec_register_equality_val_str = string.format('%d', exec_register_equality_val) end
+  end
+  imgui.SameLine()
   imgui.SetNextItemWidth(50)
   ccc, bbb = imgui.extra.InputText('##exec-register-equality-value', exec_register_equality_val_str)
   if ccc then
-    ccc = tonumber(bbb, 16)
+    local base = 10
+    local base_format = '%d'
+    if exec_register_equality_hex then
+      base = 16
+      base_format = '0x%x'
+    end
+    ccc = tonumber(bbb, base)
     if (ccc) then
       exec_register_equality_val = ccc
-      exec_register_equality_val_str = string.format('0x%x', ccc)
+      exec_register_equality_val_str = string.format(base_format, ccc)
     end
   end
   imgui.SameLine()

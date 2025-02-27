@@ -4,7 +4,7 @@ local breakpoint_list = {}
 local breakpoint_data_list = {}
 local counter = 0
 
-storeOpcodes = {
+local storeOpcodes = {
     [0x28] = 'STORE', -- sb
     [0x29] = 'STORE', -- sh
     [0x2a] = 'STORE', -- swl
@@ -12,7 +12,7 @@ storeOpcodes = {
     [0x2e] = 'STORE', -- swr
     [0x3a] = 'STORE', -- swc2
 }
-loadOpcodes = {
+local loadOpcodes = {
     [0x20] = 'LOAD', -- lb
     [0x24] = 'LOAD', -- lbu
     [0x21] = 'LOAD', -- lh
@@ -47,35 +47,35 @@ function isLoad(code)
   local offsett = bit.band(code, 0xffff)
   return true, offsett
 end
-function get_register_value_from_bits(b)
-  if b == 0x01 then return PCSX.getRegisters().GPR.n.at
-  elseif b == 0x02 then return PCSX.getRegisters().GPR.n.v0
-  elseif b == 0x03 then return PCSX.getRegisters().GPR.n.v1
-  elseif b == 0x04 then return PCSX.getRegisters().GPR.n.a0
-  elseif b == 0x05 then return PCSX.getRegisters().GPR.n.a1
-  elseif b == 0x06 then return PCSX.getRegisters().GPR.n.a2
-  elseif b == 0x07 then return PCSX.getRegisters().GPR.n.a3
-  elseif b == 0x08 then return PCSX.getRegisters().GPR.n.t0
-  elseif b == 0x09 then return PCSX.getRegisters().GPR.n.t1
-  elseif b == 0x0a then return PCSX.getRegisters().GPR.n.t2
-  elseif b == 0x0b then return PCSX.getRegisters().GPR.n.t3
-  elseif b == 0x0c then return PCSX.getRegisters().GPR.n.t4
-  elseif b == 0x0d then return PCSX.getRegisters().GPR.n.t5
-  elseif b == 0x0e then return PCSX.getRegisters().GPR.n.t6
-  elseif b == 0x0f then return PCSX.getRegisters().GPR.n.t7
-  elseif b == 0x10 then return PCSX.getRegisters().GPR.n.s0
-  elseif b == 0x11 then return PCSX.getRegisters().GPR.n.s1
-  elseif b == 0x12 then return PCSX.getRegisters().GPR.n.s2
-  elseif b == 0x13 then return PCSX.getRegisters().GPR.n.s3
-  elseif b == 0x14 then return PCSX.getRegisters().GPR.n.s4
-  elseif b == 0x15 then return PCSX.getRegisters().GPR.n.s5
-  elseif b == 0x16 then return PCSX.getRegisters().GPR.n.s6
-  elseif b == 0x17 then return PCSX.getRegisters().GPR.n.s7
-  elseif b == 0x18 then return PCSX.getRegisters().GPR.n.t8
-  elseif b == 0x19 then return PCSX.getRegisters().GPR.n.t9
-  elseif b == 0x1c then return PCSX.getRegisters().GPR.n.gp
-  elseif b == 0x1d then return PCSX.getRegisters().GPR.n.sp
-  elseif b == 0x1f then return PCSX.getRegisters().GPR.n.ra
+function get_register_value(register)
+  if register == 0x01 then return PCSX.getRegisters().GPR.n.at
+  elseif register == 0x02 then return PCSX.getRegisters().GPR.n.v0
+  elseif register == 0x03 then return PCSX.getRegisters().GPR.n.v1
+  elseif register == 0x04 then return PCSX.getRegisters().GPR.n.a0
+  elseif register == 0x05 then return PCSX.getRegisters().GPR.n.a1
+  elseif register == 0x06 then return PCSX.getRegisters().GPR.n.a2
+  elseif register == 0x07 then return PCSX.getRegisters().GPR.n.a3
+  elseif register == 0x08 then return PCSX.getRegisters().GPR.n.t0
+  elseif register == 0x09 then return PCSX.getRegisters().GPR.n.t1
+  elseif register == 0x0a then return PCSX.getRegisters().GPR.n.t2
+  elseif register == 0x0b then return PCSX.getRegisters().GPR.n.t3
+  elseif register == 0x0c then return PCSX.getRegisters().GPR.n.t4
+  elseif register == 0x0d then return PCSX.getRegisters().GPR.n.t5
+  elseif register == 0x0e then return PCSX.getRegisters().GPR.n.t6
+  elseif register == 0x0f then return PCSX.getRegisters().GPR.n.t7
+  elseif register == 0x10 then return PCSX.getRegisters().GPR.n.s0
+  elseif register == 0x11 then return PCSX.getRegisters().GPR.n.s1
+  elseif register == 0x12 then return PCSX.getRegisters().GPR.n.s2
+  elseif register == 0x13 then return PCSX.getRegisters().GPR.n.s3
+  elseif register == 0x14 then return PCSX.getRegisters().GPR.n.s4
+  elseif register == 0x15 then return PCSX.getRegisters().GPR.n.s5
+  elseif register == 0x16 then return PCSX.getRegisters().GPR.n.s6
+  elseif register == 0x17 then return PCSX.getRegisters().GPR.n.s7
+  elseif register == 0x18 then return PCSX.getRegisters().GPR.n.t8
+  elseif register == 0x19 then return PCSX.getRegisters().GPR.n.t9
+  elseif register == 0x1c then return PCSX.getRegisters().GPR.n.gp
+  elseif register == 0x1d then return PCSX.getRegisters().GPR.n.sp
+  elseif register == 0x1f then return PCSX.getRegisters().GPR.n.ra
   end
 end
 function get_4_byte_from_memory(address)
@@ -113,8 +113,8 @@ function breakpoint_on_write_change_fun(address, bytes, label)
   local code = get_4_byte_from_memory(PCSX.getRegisters().pc)
   local isStoreCode, offset = isStore(code)
   if isStoreCode then
-    local address = get_register_value_from_bits(bit.band(bit.rshift(code, 21), 0x1f)) + offset
-    local new_value = get_register_value_from_bits(bit.band(bit.rshift(code, 16), 0x1f))
+    local address = get_register_value(bit.band(bit.rshift(code, 21), 0x1f)) + offset
+    local new_value = get_register_value(bit.band(bit.rshift(code, 16), 0x1f))
     local old_value = read_value_from_memory(address, bytes);
 
     if old_value ~= new_value then
@@ -134,7 +134,7 @@ function breakpoint_read_write_equality_fun(exe_address, type_, bytes, name, val
     local code = get_4_byte_from_memory(PCSX.getRegisters().pc)
     local bool, offset = isLoad(code)
     if bool then
-      local address = get_register_value_from_bits(bit.band(bit.rshift(code, 21), 0x1f)) + offset
+      local address = get_register_value(bit.band(bit.rshift(code, 21), 0x1f)) + offset
       local mem_value = read_value_from_memory(address, bytes)
 
       if is_equality_true(mem_value, value, equality) then
@@ -150,60 +150,21 @@ function breakpoint_read_write_equality(address, type_, bytes, name, value, equa
   counter = counter + 1
 end
 
---[[
-function get_register_value(r)
-    local regs = 0xBAADF00D
-    if r == 's0' then regs = PCSX.getRegisters().GPR.n.s0
-    elseif r == 's1' then regs = PCSX.getRegisters().GPR.n.s1
-    elseif r == 's2' then regs = PCSX.getRegisters().GPR.n.s2
-    elseif r == 's3' then regs = PCSX.getRegisters().GPR.n.s3
-    elseif r == 's4' then regs = PCSX.getRegisters().GPR.n.s4
-    elseif r == 's5' then regs = PCSX.getRegisters().GPR.n.s5
-    elseif r == 's6' then regs = PCSX.getRegisters().GPR.n.s6
-    elseif r == 's7' then regs = PCSX.getRegisters().GPR.n.s7
-    elseif r == 't0' then regs = PCSX.getRegisters().GPR.n.t0
-    elseif r == 't1' then regs = PCSX.getRegisters().GPR.n.t1
-    elseif r == 't2' then regs = PCSX.getRegisters().GPR.n.t2
-    elseif r == 't3' then regs = PCSX.getRegisters().GPR.n.t3
-    elseif r == 't4' then regs = PCSX.getRegisters().GPR.n.t4
-    elseif r == 't5' then regs = PCSX.getRegisters().GPR.n.t5
-    elseif r == 't6' then regs = PCSX.getRegisters().GPR.n.t6
-    elseif r == 't7' then regs = PCSX.getRegisters().GPR.n.t7
-    elseif r == 't8' then regs = PCSX.getRegisters().GPR.n.t8
-    elseif r == 't9' then regs = PCSX.getRegisters().GPR.n.t9
-    elseif r == 'at' then regs = PCSX.getRegisters().GPR.n.at
-    elseif r == 'v0' then regs = PCSX.getRegisters().GPR.n.v0
-    elseif r == 'v1' then regs = PCSX.getRegisters().GPR.n.v1
-    elseif r == 'a0' then regs = PCSX.getRegisters().GPR.n.a0
-    elseif r == 'a1' then regs = PCSX.getRegisters().GPR.n.a1
-    elseif r == 'a2' then regs = PCSX.getRegisters().GPR.n.a2
-    elseif r == 'a3' then regs = PCSX.getRegisters().GPR.n.a3
+function breakpoint_exec_register_equality_fun(exe_address, name, register, equality, value)
+  return PCSX.addBreakpoint(exe_address, 'Exec', 4, name, function(address, w, c)
+    if is_equality_true(get_register_value(register), value, equality) then
+      PCSX.pauseEmulator()
     end
-    return regs
+  end)
+end
+function breakpoint_exec_register_equality(address, name, register, equality, value)
+  if address < 1 then return end
+  if address < 0x80000000 then address = address + 0x80000000 end
+  breakpoint_list[counter] = breakpoint_exec_register_equality_fun(address, name, register, equality, value)
+  counter = counter + 1
 end
 
-function bpe(a, n)
-    break_point_exec(a, n, 'Exec', 1)
-end
-function bpr(a, n)
-    break_point_exec(a, n, 'Read', 1)
-end
-function bpw(a, n)
-    break_point_exec(a, n, 'Write', 1)
-end
-function bpr2(a, n)
-    break_point_exec(a, n, 'Read', 2)
-end
-function bpw2(a, n)
-    break_point_exec(a, n, 'Write', 2)
-end
-function bpr4(a, n)
-    break_point_exec(a, n, 'Read', 4)
-end
-function bpw4(a, n)
-    break_point_exec(a, n, 'Write', 4)
-end
-
+--[[
 local table_what_instruction_access = {}
 function what_ins_access_base(a, n, r)
     if a < 1 then return end
@@ -222,12 +183,6 @@ end
 function what_ins_access(a, r)
     what_ins_access_base(a, '', r)
 end
-
-local registers = {'at', 'v0', 'v1', 'a0', 'a1', 'a2', 'a3',
-    't0', 't1', 't2', 't3', 't4', 't5', 't6', 't7', 't8', 't9',
-    's0', 's1', 's2', 's3', 's4', 's5', 's6', 's7'
-}
-local reg = registers[1]
 
 local table_what_access_this = {}
 function what_access_this_base(a, n)
@@ -282,24 +237,6 @@ function break_point_memory(a, v)
       )
     counter = counter + 1
 end
-function bpmemr(a, v)
-    break_point_memory(a, v, 'Read', 1)
-end
-function bpmemw(a, v)
-    break_point_memory(a, v, 'Write', 1)
-end
-function bpmemr2(a, v)
-    break_point_memory(a, v, 'Read', 2)
-end
-function bpmemw2(a, v)
-    break_point_memory(a, v, 'Write', 2)
-end
-function bpmemr4(a, v)
-    break_point_memory(a, v, 'Read', 4)
-end
-function bpmemw4(a, v)
-    break_point_memory(a, v, 'Write', 4)
-end
 
 test02_breakpoints = {}
 test02_arrange = {}
@@ -326,44 +263,91 @@ local ji2 = 1
 ]]
 
 
-break_point_label = ''
-byte_list = { ['4 Bytes'] = 4, ['2 Byte'] = 2, ['Byte'] = 1 }
-equality_list = { [0] = '==', [1] = '!=', [2] = '>', [3] = '>=', [4] = '<', [5] = '<=' }
+local break_point_label = ''
+local byte_list = {
+  { name = 'Byte'   , value = 1 },
+  { name = '2 Byte' , value = 2 },
+  { name = '4 Bytes', value = 4 },
+}
+local equality_list = {
+  { name = '==', value = 0 },
+  { name = '!=', value = 1 },
+  { name = '>' , value = 2 },
+  { name = '>=', value = 3 },
+  { name = '<' , value = 4 },
+  { name = '<=', value = 5 },
+}
+local register_list = {
+  { name = 'at', value = 0x01 },
+  { name = 'v0', value = 0x02 },
+  { name = 'v1', value = 0x03 },
+  { name = 'a0', value = 0x04 },
+  { name = 'a1', value = 0x05 },
+  { name = 'a2', value = 0x06 },
+  { name = 'a3', value = 0x07 },
+  { name = 't0', value = 0x08 },
+  { name = 't1', value = 0x09 },
+  { name = 't2', value = 0x0a },
+  { name = 't3', value = 0x0b },
+  { name = 't4', value = 0x0c },
+  { name = 't5', value = 0x0d },
+  { name = 't6', value = 0x0e },
+  { name = 't7', value = 0x0f },
+  { name = 's0', value = 0x10 },
+  { name = 's1', value = 0x11 },
+  { name = 's2', value = 0x12 },
+  { name = 's3', value = 0x13 },
+  { name = 's4', value = 0x14 },
+  { name = 's5', value = 0x15 },
+  { name = 's6', value = 0x16 },
+  { name = 's7', value = 0x17 },
+  { name = 't8', value = 0x18 },
+  { name = 't9', value = 0x19 },
+}
 --
-exec_addr = 0
-exec_addr_str = '0'
+local exec_addr = 0
+local exec_addr_str = ''
 --
-read_write_change_addr = 0
-read_write_change_addr_str = '0'
-read_write_change_bytes = 1
-read_write_change_bytes_str = 'Byte'
+local read_write_change_addr = 0
+local read_write_change_addr_str = ''
+local read_write_change_bytes = 1
+local read_write_change_bytes_str = 'Byte'
 --
-read_write_equality_addr = 0
-read_write_equality_addr_str = '0'
-read_write_equality = 0
-read_write_equality_str = '=='
-read_write_equality_bytes = 1
-read_write_equality_bytes_str = 'Byte'
-read_write_equality_addr_val = 0
-read_write_equality_addr_val_str = '0'
+local read_write_equality_addr = 0
+local read_write_equality_addr_str = ''
+local read_write_equality = 0
+local read_write_equality_str = '=='
+local read_write_equality_bytes = 1
+local read_write_equality_bytes_str = 'Byte'
+local read_write_equality_addr_val = 0
+local read_write_equality_addr_val_str = '0'
+--
+local exec_register_equality_addr = 0
+local exec_register_equality_addr_str = ''
+local exec_register_equality_reg = 0x01
+local exec_register_equality_reg_str = 'at'
+local exec_register_equality = 0
+local exec_register_equality_str = '=='
+local exec_register_equality_val = 0
+local exec_register_equality_val_str = '0'
 function DrawImguiFrame()
   local window = imgui.Begin('Debug Script', true)
   if not window then imgui.End() return end
 
-  imgui.TextUnformatted('Name:')
+  imgui.TextUnformatted('Label:    ')
   imgui.SameLine()
   local ccc, bbb = imgui.extra.InputText('##break-point-label', break_point_label)
   if ccc then break_point_label = bbb end
 
   imgui.TextUnformatted('Address:')
   imgui.SameLine()
-  imgui.SetNextItemWidth(75)
+  imgui.SetNextItemWidth(70)
   ccc, bbb = imgui.extra.InputText('##exec-address', exec_addr_str)
   if ccc then
     ccc = tonumber(bbb, 16)
     if ccc then
       exec_addr = ccc
-      exec_addr_str = string.format('0x%08x', ccc)
+      exec_addr_str = string.format('%08x', ccc)
     end
   end
   imgui.SameLine()
@@ -377,16 +361,16 @@ function DrawImguiFrame()
     ccc = tonumber(bbb, 16)
     if (ccc) then
       read_write_change_addr = ccc
-      read_write_change_addr_str = string.format('0x%08x', ccc)
+      read_write_change_addr_str = string.format('%08x', ccc)
     end
   end
   imgui.SameLine()
   imgui.PushItemWidth(65)
   imgui.safe.BeginCombo('##read-write-change-bytes', read_write_change_bytes_str , function()
     for k, v in pairs(byte_list) do
-      if imgui.Selectable(k) then
-        read_write_change_bytes = v
-        read_write_change_bytes_str = k
+      if imgui.Selectable(v.name) then
+        read_write_change_bytes = v.value
+        read_write_change_bytes_str = v.name
       end
     end
   end)
@@ -405,16 +389,16 @@ function DrawImguiFrame()
     ccc = tonumber(bbb, 16)
     if (ccc) then
       read_write_equality_addr = ccc
-      read_write_equality_addr_str = string.format('0x%08x', ccc)
+      read_write_equality_addr_str = string.format('%08x', ccc)
     end
   end
   imgui.SameLine()
   imgui.PushItemWidth(65)
   imgui.safe.BeginCombo('##read-write-equality-bytes', read_write_equality_bytes_str , function()
     for k, v in pairs(byte_list) do
-      if imgui.Selectable(k) then
-        read_write_equality_bytes = v
-        read_write_equality_bytes_str = k
+      if imgui.Selectable(v.name) then
+        read_write_equality_bytes = v.value
+        read_write_equality_bytes_str = v.name
       end
     end
   end)
@@ -422,9 +406,9 @@ function DrawImguiFrame()
   imgui.PushItemWidth(40)
   imgui.safe.BeginCombo('##read-write-equality-value-equality', read_write_equality_str , function()
     for k, v in pairs(equality_list) do
-      if imgui.Selectable(v) then
-        read_write_equality = k
-        read_write_equality_str = v
+      if imgui.Selectable(v.name) then
+        read_write_equality = v.value
+        read_write_equality_str = v.name
       end
     end
   end)
@@ -444,6 +428,53 @@ function DrawImguiFrame()
   if imgui.Button('Read##read-write-equality1') then breakpoint_read_write_equality(read_write_equality_addr, 'Read', read_write_equality_bytes, break_point_label, read_write_equality_addr_val, read_write_equality) end
   imgui.SameLine()
   if imgui.Button('Write##read-write-equality2') then breakpoint_read_write_equality(read_write_equality_addr, 'Write', read_write_equality_bytes, break_point_label, read_write_equality_addr_val, read_write_equality) end
+
+  imgui.TextUnformatted('Address:')
+  imgui.SameLine()
+  imgui.SetNextItemWidth(75)
+  ccc, bbb = imgui.extra.InputText('##exec-register-equality-address', exec_register_equality_addr_str)
+  if ccc then
+    ccc = tonumber(bbb, 16)
+    if (ccc) then
+      exec_register_equality_addr = ccc
+      exec_register_equality_addr_str = string.format('%08x', ccc)
+    end
+  end
+  imgui.SameLine()
+  imgui.PushItemWidth(65)
+  imgui.safe.BeginCombo('##exec-register-equality-reg', exec_register_equality_reg_str , function()
+    for k, v in pairs(register_list) do
+      if imgui.Selectable(v.name) then
+        exec_register_equality_reg = v.value
+        exec_register_equality_reg_str = v.name
+      end
+    end
+  end)
+  imgui.SameLine()
+  imgui.PushItemWidth(40)
+  imgui.safe.BeginCombo('##exec-register-equality', exec_register_equality_str , function()
+    for k, v in pairs(equality_list) do
+      if imgui.Selectable(v.name) then
+        exec_register_equality = v.value
+        exec_register_equality_str = v.name
+      end
+    end
+  end)
+  imgui.SameLine()
+  imgui.TextUnformatted('Value:')
+  imgui.SameLine()
+  imgui.SetNextItemWidth(50)
+  ccc, bbb = imgui.extra.InputText('##exec-register-equality-value', exec_register_equality_val_str)
+  if ccc then
+    ccc = tonumber(bbb, 16)
+    if (ccc) then
+      exec_register_equality_val = ccc
+      exec_register_equality_val_str = string.format('0x%x', ccc)
+    end
+  end
+  imgui.SameLine()
+  if imgui.Button('Exec on Register##exec-register-equality-button') then breakpoint_exec_register_equality(exec_register_equality_addr, break_point_label, exec_register_equality_reg, exec_register_equality, exec_register_equality_val) end
+
   imgui.End()
 end
 print('Debugging Script is Loaded')

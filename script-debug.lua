@@ -25,6 +25,8 @@ local color = {
   blue = 0xffD94545,
   green = 0xff00A64B,
   orange = 0xff02ABE2,
+  red = 0xff6666ff,
+  pink = 0xffF066FF,
 }
 
 local function breakpoint(address, name, type_, bytes)
@@ -198,6 +200,15 @@ local function breakpoint_exec_memory_equality(address, bytes, name, value, equa
   counter = counter + 1
 end
 
+local instruction_accesses_table = {}
+local function test(address)
+  table.insert(instruction_accesses_table, { address = counter, data = {
+    { address = 0x80000000 + counter, count = 9 + counter, type = 'R' },
+    { address = 0x80000022 + counter, count = 7 + counter, type = 'W' },
+  }, name = string.format('label %d', counter)})
+  counter = counter + 1
+end
+
 --[[
 local table_what_instruction_access = {}
 function what_ins_access_base(a, n, r)
@@ -243,33 +254,6 @@ function what_access_this_base(a, n)
 end
 function what_access_this(a)
     what_access_this_base(a, '')
-end
-
-function break_point_register(a, r, v)
-    if a < 1 then return end
-    if a < 0x80000000 then a = a + 0x80000000 end
-    break_point_list[counter] = PCSX.addBreakpoint(a, 'Exec', 1, r,
-        function(address, width, cause)
-          local regs = get_register_value(r)
-          if regs == v then PCSX.pauseEmulator() end
-        end
-      )
-    counter = counter + 1
-end
-function bpreg(a, r, v, t, b)
-    break_point_register(a, r, v)
-end
-
-function break_point_memory(a, v)
-    if a < 1 then return end
-    if a < 0x80000000 then a = a + 0x80000000 end
-    break_point_list[counter] = PCSX.addBreakpoint(a, t, b, '' .. v,
-        function(address, width, cause)
-          local memory = PCSX.getMemPtr()[a - 0x80000000]
-          if memory == v then PCSX.pauseEmulator() end
-        end
-      )
-    counter = counter + 1
 end
 
 test02_breakpoints = {}
@@ -386,6 +370,9 @@ local exec_memory_equality = 0
 local exec_memory_equality_str = '=='
 local exec_memory_pc = 0
 local exec_memory_pc_str = ''
+--
+local instruction_accesses_addr = 0
+local instruction_accesses_addr_str = ''
 
 function DrawImguiFrame()
   local bool, value = imgui.Begin('Debugging Script', true)
@@ -668,8 +655,43 @@ function DrawImguiFrame()
   imgui.PopStyleColor()
   imgui.PopStyleVar()
 
+  -- 5th Row
   imgui.TextUnformatted('Address:')
+  imgui.SameLine()
+  imgui.SetNextItemWidth(75)
+  bool, value = imgui.extra.InputText('##instruction-accesses-address', instruction_accesses_addr_str)
+  if bool then
+    bool = tonumber(value, 16)
+    if (bool) then
+      instruction_accesses_addr = bool
+      instruction_accesses_addr_str = string.format('%08x', bool)
+    end
+  end
+  if imgui.IsItemHovered() then
+    if imgui.IsMouseDoubleClicked(imgui.constant.MouseButton.Left) then imgui.SetClipboardText(instruction_accesses_addr_str) end
+    if imgui.IsMouseDoubleClicked(imgui.constant.MouseButton.Right) then
+      value = tonumber(imgui.GetClipboardText(), 16)
+      if value then
+        instruction_accesses_addr = value
+        instruction_accesses_addr_str = string.format('%x', instruction_accesses_addr)
+      end
+    end
+  end
+  imgui.SameLine()
+  imgui.PushStyleVar(imgui.constant.StyleVar.FrameRounding, 3)
+  imgui.PushStyleColor(imgui.constant.Col.Button, color.red)
+  if imgui.Button('What Instruction Accesses##instruction-accesses-button', 160, 22) then test(instruction_accesses_addr) end
+  imgui.PopStyleColor()
+  imgui.PopStyleVar()
+
+  -- 6th Row
   imgui.TextUnformatted('Address:')
+  imgui.SameLine()
+  imgui.PushStyleVar(imgui.constant.StyleVar.FrameRounding, 3)
+  imgui.PushStyleColor(imgui.constant.Col.Button, color.pink)
+  if imgui.Button('What Instruction Accesses##instruction-accesses-button2', 160, 22) then print('what instruction accesses') end
+  imgui.PopStyleColor()
+  imgui.PopStyleVar()
 
   -- 7th Row
   imgui.TextUnformatted('Address:')
@@ -704,7 +726,7 @@ function DrawImguiFrame()
     end
   end)
   imgui.SameLine()
-  imgui.TextUnformatted('PC:') -- todo: cp
+  imgui.TextUnformatted('PC:')
   imgui.SameLine()
   imgui.SetNextItemWidth(60)
   bool, value = imgui.extra.InputText('##read-write-pc-value', read_write_pc_val_str)
@@ -850,6 +872,54 @@ function DrawImguiFrame()
   if imgui.Button('Exec##exec-memory-button', 70, 22) then breakpoint_exec_memory_equality(exec_memory_addr, exec_memory_bytes, break_point_label, exec_memory_val, exec_memory_equality, exec_memory_pc) end
   imgui.PopStyleColor()
   imgui.PopStyleVar()
+
+  -- for k, v in pairs(instruction_accesses_table) do
+  --   imgui.safe.Begin(v.address, function ()
+  --     imgui.Columns(3, "mycolumns3")
+  --     imgui.TextUnformatted('address1')
+  --     imgui.NextColumn()
+  --     imgui.TextUnformatted('count1')
+  --     imgui.NextColumn()
+  --     imgui.TextUnformatted('value1')
+  --     imgui.NextColumn()
+  --     imgui.Columns(1)
+  --   end)
+  -- end
+  for k, v in pairs(instruction_accesses_table) do
+    imgui.safe.Begin(string.format(v.name .. ' - %08x', v.address), function ()
+      imgui.BeginTable(string.format('t%x', v.address), 4, imgui.constant.TableFlags.Borders)
+
+      imgui.TableSetupColumn("index", imgui.constant.TableColumnFlags.WidthFixed)
+      imgui.TableSetupColumn("Address", imgui.constant.TableColumnFlags.WidthFixed)
+      imgui.TableSetupColumn("Count", imgui.constant.TableColumnFlags.WidthFixed)
+      imgui.TableSetupColumn("Type", imgui.constant.TableColumnFlags.WidthFixed)
+      imgui.TableHeadersRow()
+
+      local i = 1
+      for k1, v1 in pairs(v.data) do
+        imgui.TableNextRow()
+        imgui.TableNextColumn()
+        imgui.TextUnformatted(i)
+        imgui.TableNextColumn()
+        imgui.TextUnformatted(string.format('%08x', v1.address))
+        imgui.TableNextColumn()
+        imgui.TextUnformatted(v1.count)
+        imgui.TableNextColumn()
+        imgui.TextUnformatted(v1.type)
+        i = i + 1
+      end
+
+      imgui.EndTable()
+      imgui.Button(string.format('%08x', v.address))
+      imgui.SameLine()
+      imgui.Button('Stop')
+      imgui.SameLine()
+      imgui.Button('Reset')
+      imgui.SameLine()
+      imgui.Button('Remove')
+      imgui.SameLine()
+    end)
+  end
 
   imgui.End()
 end

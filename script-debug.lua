@@ -226,66 +226,26 @@ function debugger:breakpoint_what_instruction_accesses(address, name)
   if instruction_accesses_table[address] ~= nil then return end
   instruction_accesses_table[address] = { address = address, data = {}, name = name, breakpoint = nil }
   instruction_accesses_table[address].breakpoint = debugger:breakpoint_what_instruction_accesses_fun(address, name, instruction_accesses_table[address].data)
-  counter = counter + 1
 end
 
+function debugger:breakpoint_what_access_this_memory_fun(address, bytes, type_, name, data, symbol)
+  return PCSX.addBreakpoint(address, type_, bytes, name, function(address, w, c)
+    local exe_address = PCSX.getRegisters().pc
+    if data[exe_address] == nil then data[exe_address] = { address = exe_address, count = 0, type = symbol } end
+    data[exe_address].count = data[exe_address].count + 1
+  end)
+end
+
+local access_this_memory_table = {}
 function debugger:breakpoint_what_access_this_memory(address, bytes, name)
   if address < 1 then return end
   if address < 0x80000000 then address = address + 0x80000000 end
-  -- todo: cp
+  if access_this_memory_table[address] ~= nil then return end
+  access_this_memory_table[address] = { address = address, data = {}, name = name, breakpoint = nil }
+  access_this_memory_table[address].read_breakpoint = debugger:breakpoint_what_access_this_memory_fun(address, bytes, 'Read', name, access_this_memory_table[address].data, 'R')
+  access_this_memory_table[address].write_breakpoint = debugger:breakpoint_what_access_this_memory_fun(address, bytes, 'Write', name, access_this_memory_table[address].data, 'W')
 end
 
---[[
-local table_what_access_this = {}
-function what_access_this_base(a, n)
-    if a < 1 then return end
-    if a < 0x80000000 then a = a + 0x80000000 end
-    break_point_list[counter] = PCSX.addBreakpoint(a, 'Read', 1, n,
-        function(address, width, cause)
-          PCSX.pauseEmulator()
-          local str = string.format('%x - R', PCSX.getRegisters().pc)
-          table_what_access_this[str] = PCSX.getRegisters().pc
-          PCSX.resumeEmulator()
-        end
-      )
-    counter = counter + 1
-    break_point_list[counter] = PCSX.addBreakpoint(a, 'Write', 1, n,
-        function(address, width, cause)
-          PCSX.pauseEmulator()
-          local str = string.format('%x - W', PCSX.getRegisters().pc)
-          table_what_access_this[str] = PCSX.getRegisters().pc
-          PCSX.resumeEmulator()
-        end
-      )
-    counter = counter + 1
-end
-function what_access_this(a)
-    what_access_this_base(a, '')
-end
-
-test02_breakpoints = {}
-test02_arrange = {}
-test02_counter = {}
-test02_total = 0
-function test01(a, r)
-  if a < 1 then return end
-    if a < 0x80000000 then a = a + 0x80000000 end
-    table.insert(test02_breakpoints, PCSX.addBreakpoint(a, 'Exec', 1, r,
-        function(address, width, cause)
-          local regs = get_register_value(r)
-          if test02_counter[regs] == nil then
-            test02_counter[regs] = 1
-            test02_total = test02_total + 1
-            test02_arrange[test02_total] = regs
-          else
-            test02_counter[regs] = test02_counter[regs] + 1
-          end
-        end
-      ))
-end
-local ji = ''
-local ji2 = 1
-]]
 
 local breakpoint_label = ''
 local byte_list = {
@@ -927,7 +887,9 @@ function DrawImguiFrame()
   imgui.Separator()
 
   for k, v in pairs(instruction_accesses_table) do
-    imgui.safe.Begin(string.format(v.name .. ' - %08x', v.address), function ()
+    imgui.PushID('instruction_accesses_table')
+    imgui.safe.Begin(string.format('Accessed addresses by %08x', v.address), function ()
+      imgui.TextUnformatted("Name: ") imgui.SameLine() imgui.TextUnformatted(v.name)
       imgui.BeginTable(string.format('t%x', v.address), 4, imgui.constant.TableFlags.Borders)
 
       imgui.TableSetupColumn("index", imgui.constant.TableColumnFlags.WidthFixed)
@@ -979,12 +941,79 @@ function DrawImguiFrame()
         table.insert(remove_instruction_accesses_table, k)
       end
     end)
+    imgui.PopID()
   end
   if #remove_instruction_accesses_table then
     for k, v in pairs(remove_instruction_accesses_table) do
       instruction_accesses_table[v] = nil
     end
     remove_instruction_accesses_table = {}
+  end
+
+  for k, v in pairs(access_this_memory_table) do
+    imgui.PushID('access_this_memory_table')
+    imgui.safe.Begin(string.format('The following instructions accessed %08x', v.address), function ()
+      imgui.TextUnformatted("Name: ") imgui.SameLine() imgui.TextUnformatted(v.name)
+      imgui.BeginTable(string.format('t%x', v.address), 4, imgui.constant.TableFlags.Borders)
+
+      imgui.TableSetupColumn("index", imgui.constant.TableColumnFlags.WidthFixed)
+      imgui.TableSetupColumn("Address", imgui.constant.TableColumnFlags.WidthFixed)
+      imgui.TableSetupColumn("Count", imgui.constant.TableColumnFlags.WidthFixed)
+      imgui.TableSetupColumn("Type", imgui.constant.TableColumnFlags.WidthFixed)
+      imgui.TableHeadersRow()
+
+      local i = 1
+      for k1, v1 in pairs(v.data) do
+        imgui.TableNextRow()
+        imgui.TableNextColumn()
+        imgui.TextUnformatted(i)
+        imgui.TableNextColumn()
+        if imgui.SmallButton(string.format('%08x##%d%d', v1.address, v.address, v1.address)) then
+          imgui.SetClipboardText(string.format('%08x', v1.address))
+        end
+        if imgui.IsMouseClicked(imgui.constant.MouseButton.Right) and imgui.IsItemHovered() then
+          PCSX.GUI.jumpToPC(v1.address)
+        end
+        imgui.TableNextColumn()
+        imgui.TextUnformatted(v1.count)
+        imgui.TableNextColumn()
+        imgui.TextUnformatted(v1.type)
+        i = i + 1
+      end
+
+      imgui.EndTable()
+      if imgui.Button(string.format('%08x', v.address)) then
+        PCSX.GUI.jumpToMemory(v.address)
+			  imgui.SetClipboardText(string.format('%08x', v.address))
+      end
+      imgui.SameLine()
+      if v.read_breakpoint:isEnabled() and v.write_breakpoint:isEnabled() then
+        if imgui.Button('Stop') then v.read_breakpoint:disable() v.write_breakpoint:disable() end
+      else
+        if imgui.Button('Start') then v.read_breakpoint:enable() v.write_breakpoint:enable() end
+      end
+      imgui.SameLine()
+      if imgui.Button('Reset') then
+        for k1, v1 in pairs(v.data) do
+          v1.count = 0
+        end
+      end
+      imgui.SameLine()
+      if imgui.Button('Remove') then
+        v.read_breakpoint:disable()
+        v.write_breakpoint:disable()
+        v.read_breakpoint:remove()
+        v.write_breakpoint:remove()
+        table.insert(remove_access_this_memory_table, k)
+      end
+    end)
+    imgui.PopID()
+  end
+  if #remove_access_this_memory_table then
+    for k, v in pairs(remove_access_this_memory_table) do
+      access_this_memory_table[v] = nil
+    end
+    remove_access_this_memory_table = {}
   end
 
   imgui.End()

@@ -228,6 +228,10 @@ local function breakpoint_what_instruction_accesses(address, name)
   counter = counter + 1
 end
 
+local function breakpoint_what_access_this_memory(address, bytes, name)
+  print(4)
+end
+
 --[[
 local table_what_access_this = {}
 function what_access_this_base(a, n)
@@ -374,6 +378,12 @@ local exec_memory_pc_str = ''
 local instruction_accesses_addr = 0
 local instruction_accesses_addr_str = ''
 local remove_instruction_accesses_table = {}
+--
+local access_this_memory_addr = 0
+local access_this_memory_addr_str = ''
+local access_this_memory_bytes = 1
+local access_this_memory_bytes_str = 'Byte'
+local remove_access_this_memory_table = {}
 
 function DrawImguiFrame()
   local bool, value = imgui.Begin('Debugging Script', true)
@@ -694,9 +704,19 @@ function DrawImguiFrame()
   imgui.Separator() imgui.TextUnformatted('|6| ') imgui.SameLine()
   imgui.TextUnformatted('Address:')
   imgui.SameLine()
+  imgui.SetNextItemWidth(75)
+  bool, value = imgui.extra.InputText('##access-this-memory-address', access_this_memory_addr_str)
+  if bool then
+    bool = tonumber(value, 16)
+    if (bool) then
+      access_this_memory_addr = bool
+      access_this_memory_addr_str = string.format('%08x', bool)
+    end
+  end
+  imgui.SameLine()
   imgui.PushStyleVar(imgui.constant.StyleVar.FrameRounding, 3)
   imgui.PushStyleColor(imgui.constant.Col.Button, color.pink)
-  if imgui.Button('What Instruction Accesses##instruction-accesses-button2', 160, 22) then print('what instruction accesses') end
+  if imgui.Button('What Access this Memory##access-this-memory-button', 160, 22) then print(3) end
   imgui.PopStyleColor()
   imgui.PopStyleVar()
 

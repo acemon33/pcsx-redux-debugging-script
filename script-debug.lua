@@ -1,5 +1,6 @@
 local bit = require("bit")
 
+local debugger = {}
 local breakpoint_list = {}
 local counter = 0
 
@@ -29,7 +30,7 @@ local color = {
   pink = 0xffF066FF,
 }
 
-local function breakpoint(address, name, type_, bytes)
+function debugger:breakpoint(address, name, type_, bytes)
   if address < 1 then return end
   if address < 0x80000000 then address = address + 0x80000000 end
   breakpoint_list[counter] = PCSX.addBreakpoint(address, type_, bytes, name, function(address, w, c) PCSX.pauseEmulator() end)
@@ -116,7 +117,7 @@ local function is_equality_true(mem_value, value, equality)
   return bool
 end
 
-local function breakpoint_on_write_change_fun(address, bytes, label)
+function debugger:breakpoint_on_write_change_fun(address, bytes, label)
   local code = get_4_byte_from_memory(PCSX.getRegisters().pc)
   local isStoreCode, offset = isStore(code)
   if isStoreCode then
@@ -129,14 +130,14 @@ local function breakpoint_on_write_change_fun(address, bytes, label)
     end
   end
 end
-local function breakpoint_on_write_change(address, name, bytes)
+function debugger:breakpoint_on_write_change(address, name, bytes)
   if address < 1 then return end
   if address < 0x80000000 then address = address + 0x80000000 end
   breakpoint_list[counter] = PCSX.addBreakpoint(address, 'Write', bytes, name, breakpoint_on_write_change_fun)
   counter = counter + 1
 end
 
-local function breakpoint_read_write_equality_fun(exe_address, type_, bytes, name, value, equality)
+function debugger:breakpoint_read_write_equality_fun(exe_address, type_, bytes, name, value, equality)
   return PCSX.addBreakpoint(exe_address, type_, bytes, name, function(address, w, c)
     local code = get_4_byte_from_memory(PCSX.getRegisters().pc)
     local bool, offset = isLoad(code)
@@ -150,42 +151,42 @@ local function breakpoint_read_write_equality_fun(exe_address, type_, bytes, nam
     end
   end)
 end
-local function breakpoint_read_write_equality(address, type_, bytes, name, value, equality)
+function debugger:breakpoint_read_write_equality(address, type_, bytes, name, value, equality)
   if address < 1 then return end
   if address < 0x80000000 then address = address + 0x80000000 end
-  breakpoint_list[counter] = breakpoint_read_write_equality_fun(address, type_, bytes, name, value, equality)
+  breakpoint_list[counter] = debugger:breakpoint_read_write_equality_fun(address, type_, bytes, name, value, equality)
   counter = counter + 1
 end
 
-local function breakpoint_exec_register_equality_fun(exe_address, name, register, equality, value)
+function debugger:breakpoint_exec_register_equality_fun(exe_address, name, register, equality, value)
   return PCSX.addBreakpoint(exe_address, 'Exec', 4, name, function(address, w, c)
     if is_equality_true(get_register_value(register), value, equality) then
       PCSX.pauseEmulator()
     end
   end)
 end
-local function breakpoint_exec_register_equality(address, name, register, equality, value)
+function debugger:breakpoint_exec_register_equality(address, name, register, equality, value)
   if address < 1 then return end
   if address < 0x80000000 then address = address + 0x80000000 end
-  breakpoint_list[counter] = breakpoint_exec_register_equality_fun(address, name, register, equality, value)
+  breakpoint_list[counter] = debugger:breakpoint_exec_register_equality_fun(address, name, register, equality, value)
   counter = counter + 1
 end
 
-local function breakpoint_read_write_pc_equality_fun(exe_address, type_, bytes, name, pc, equality)
+function debugger:breakpoint_read_write_pc_equality_fun(exe_address, type_, bytes, name, pc, equality)
   return PCSX.addBreakpoint(exe_address, type_, bytes, name, function(address, w, c)
     if is_equality_true(PCSX.getRegisters().pc, pc, equality) then
       PCSX.pauseEmulator()
     end
   end)
 end
-local function breakpoint_read_write_pc_equality(address, type_, bytes, name, pc, equality)
+function debugger:breakpoint_read_write_pc_equality(address, type_, bytes, name, pc, equality)
   if address < 1 then return end
   if address < 0x80000000 then address = address + 0x80000000 end
-  breakpoint_list[counter] = breakpoint_read_write_pc_equality_fun(address, type_, bytes, name, pc, equality)
+  breakpoint_list[counter] = debugger:breakpoint_read_write_pc_equality_fun(address, type_, bytes, name, pc, equality)
   counter = counter + 1
 end
 
-local function breakpoint_exec_memory_equality_fun(mem_address, bytes, name, value, equality, pc)
+function debugger:breakpoint_exec_memory_equality_fun(mem_address, bytes, name, value, equality, pc)
   return PCSX.addBreakpoint(pc, 'Exec', bytes, name, function(address, w, c)
     local mem_value = read_value_from_memory(mem_address, bytes)
     if is_equality_true(mem_value, value, equality) then
@@ -193,14 +194,14 @@ local function breakpoint_exec_memory_equality_fun(mem_address, bytes, name, val
     end
   end)
 end
-local function breakpoint_exec_memory_equality(address, bytes, name, value, equality, pc)
+function debugger:breakpoint_exec_memory_equality(address, bytes, name, value, equality, pc)
   if address < 1 then return end
   if address < 0x80000000 then address = address + 0x80000000 end
-  breakpoint_list[counter] = breakpoint_exec_memory_equality_fun(address, bytes, name, value, equality, pc)
+  breakpoint_list[counter] = debugger:breakpoint_exec_memory_equality_fun(address, bytes, name, value, equality, pc)
   counter = counter + 1
 end
 
-local function breakpoint_what_instruction_accesses_fun(address, name, data)
+function debugger:breakpoint_what_instruction_accesses_fun(address, name, data)
   return PCSX.addBreakpoint(address, 'Exec', 4, name, function(address, w, c)
     local code = get_4_byte_from_memory(PCSX.getRegisters().pc)
     local bool, offset = isLoad(code)
@@ -219,17 +220,19 @@ local function breakpoint_what_instruction_accesses_fun(address, name, data)
 end
 
 local instruction_accesses_table = {}
-local function breakpoint_what_instruction_accesses(address, name)
+function debugger:breakpoint_what_instruction_accesses(address, name)
   if address < 1 then return end
   if address < 0x80000000 then address = address + 0x80000000 end
   if instruction_accesses_table[address] ~= nil then return end
   instruction_accesses_table[address] = { address = address, data = {}, name = name, breakpoint = nil }
-  instruction_accesses_table[address].breakpoint = breakpoint_what_instruction_accesses_fun(address, name, instruction_accesses_table[address].data)
+  instruction_accesses_table[address].breakpoint = debugger:breakpoint_what_instruction_accesses_fun(address, name, instruction_accesses_table[address].data)
   counter = counter + 1
 end
 
-local function breakpoint_what_access_this_memory(address, bytes, name)
-  print(4)
+function debugger:breakpoint_what_access_this_memory(address, bytes, name)
+  if address < 1 then return end
+  if address < 0x80000000 then address = address + 0x80000000 end
+  -- todo: cp
 end
 
 --[[
@@ -284,7 +287,7 @@ local ji = ''
 local ji2 = 1
 ]]
 
-local break_point_label = ''
+local breakpoint_label = ''
 local byte_list = {
   { name = 'Byte'   , value = 1 },
   { name = '2 Byte' , value = 2 },
@@ -393,11 +396,11 @@ function DrawImguiFrame()
   -- 0th Row
   imgui.TextUnformatted('Label:    ')
   imgui.SameLine()
-  bool, value = imgui.extra.InputText('##break-point-label', break_point_label)
-  if bool then break_point_label = value end
+  bool, value = imgui.extra.InputText('##break-point-label', breakpoint_label)
+  if bool then breakpoint_label = value end
   if imgui.IsItemHovered() then
-    if imgui.IsMouseDoubleClicked(imgui.constant.MouseButton.Left) then imgui.SetClipboardText(break_point_label) end
-    if imgui.IsMouseDoubleClicked(imgui.constant.MouseButton.Right) then break_point_label = imgui.GetClipboardText() end
+    if imgui.IsMouseDoubleClicked(imgui.constant.MouseButton.Left) then imgui.SetClipboardText(breakpoint_label) end
+    if imgui.IsMouseDoubleClicked(imgui.constant.MouseButton.Right) then breakpoint_label = imgui.GetClipboardText() end
   end
 
   -- 1th Row
@@ -426,7 +429,7 @@ function DrawImguiFrame()
   imgui.SameLine()
   imgui.PushStyleVar(imgui.constant.StyleVar.FrameRounding, 3)
   imgui.PushStyleColor(imgui.constant.Col.Button, color.orange)
-  if imgui.Button('Exec##exec-button', 70, 22) then breakpoint(exec_addr, break_point_label, 'Exec', 1) end
+  if imgui.Button('Exec##exec-button', 70, 22) then debugger:breakpoint(exec_addr, breakpoint_label, 'Exec', 1) end
   imgui.PopStyleColor()
   imgui.PopStyleVar()
 
@@ -466,19 +469,19 @@ function DrawImguiFrame()
   imgui.SameLine()
   imgui.PushStyleVar(imgui.constant.StyleVar.FrameRounding, 3)
   imgui.PushStyleColor(imgui.constant.Col.Button, color.blue)
-  if imgui.Button('Read##read-write-change1-button', 70, 22) then breakpoint(read_write_change_addr, break_point_label, 'Read', read_write_change_bytes) end
+  if imgui.Button('Read##read-write-change1-button', 70, 22) then debugger:breakpoint(read_write_change_addr, breakpoint_label, 'Read', read_write_change_bytes) end
   imgui.PopStyleColor()
   imgui.PopStyleVar()
   imgui.SameLine()
   imgui.PushStyleVar(imgui.constant.StyleVar.FrameRounding, 3)
   imgui.PushStyleColor(imgui.constant.Col.Button, color.green)
-  if imgui.Button('Write##read-write-change2-button', 70, 22) then breakpoint(read_write_change_addr, break_point_label, 'Write', read_write_change_bytes) end
+  if imgui.Button('Write##read-write-change2-button', 70, 22) then debugger:breakpoint(read_write_change_addr, breakpoint_label, 'Write', read_write_change_bytes) end
   imgui.PopStyleColor()
   imgui.PopStyleVar()
   imgui.SameLine()
   imgui.PushStyleVar(imgui.constant.StyleVar.FrameRounding, 3)
   imgui.PushStyleColor(imgui.constant.Col.Button, color.green)
-  if imgui.Button('Write on Change##read-write-change2-button', 100, 22) then breakpoint_on_write_change(read_write_change_addr, break_point_label, read_write_change_bytes) end
+  if imgui.Button('Write on Change##read-write-change2-button', 100, 22) then breakpoint_on_write_change(read_write_change_addr, breakpoint_label, read_write_change_bytes) end
   imgui.PopStyleColor()
   imgui.PopStyleVar()
 
@@ -569,13 +572,13 @@ function DrawImguiFrame()
   imgui.SameLine()
   imgui.PushStyleVar(imgui.constant.StyleVar.FrameRounding, 3)
   imgui.PushStyleColor(imgui.constant.Col.Button, color.blue)
-  if imgui.Button('Read##read-write-equality1-button', 70, 22) then breakpoint_read_write_equality(read_write_equality_addr, 'Read', read_write_equality_bytes, break_point_label, read_write_equality_addr_val, read_write_equality) end
+  if imgui.Button('Read##read-write-equality1-button', 70, 22) then debugger:breakpoint_read_write_equality(read_write_equality_addr, 'Read', read_write_equality_bytes, breakpoint_label, read_write_equality_addr_val, read_write_equality) end
   imgui.PopStyleColor()
   imgui.PopStyleVar()
   imgui.SameLine()
   imgui.PushStyleVar(imgui.constant.StyleVar.FrameRounding, 3)
   imgui.PushStyleColor(imgui.constant.Col.Button, color.green)
-  if imgui.Button('Write##read-write-equality2-button', 70, 22) then breakpoint_read_write_equality(read_write_equality_addr, 'Write', read_write_equality_bytes, break_point_label, read_write_equality_addr_val, read_write_equality) end
+  if imgui.Button('Write##read-write-equality2-button', 70, 22) then debugger:breakpoint_read_write_equality(read_write_equality_addr, 'Write', read_write_equality_bytes, breakpoint_label, read_write_equality_addr_val, read_write_equality) end
   imgui.PopStyleColor()
   imgui.PopStyleVar()
 
@@ -666,7 +669,7 @@ function DrawImguiFrame()
   imgui.SameLine()
   imgui.PushStyleVar(imgui.constant.StyleVar.FrameRounding, 3)
   imgui.PushStyleColor(imgui.constant.Col.Button, color.orange)
-  if imgui.Button('Exec##exec-register-equality-button', 70, 22) then breakpoint_exec_register_equality(exec_register_equality_addr, break_point_label, exec_register_equality_reg, exec_register_equality, exec_register_equality_val) end
+  if imgui.Button('Exec##exec-register-equality-button', 70, 22) then debugger:breakpoint_exec_register_equality(exec_register_equality_addr, breakpoint_label, exec_register_equality_reg, exec_register_equality, exec_register_equality_val) end
   imgui.PopStyleColor()
   imgui.PopStyleVar()
 
@@ -696,7 +699,7 @@ function DrawImguiFrame()
   imgui.SameLine()
   imgui.PushStyleVar(imgui.constant.StyleVar.FrameRounding, 3)
   imgui.PushStyleColor(imgui.constant.Col.Button, color.red)
-  if imgui.Button('What Instruction Accesses##instruction-accesses-button', 160, 22) then breakpoint_what_instruction_accesses(instruction_accesses_addr, break_point_label) end
+  if imgui.Button('What Instruction Accesses##instruction-accesses-button', 160, 22) then debugger:breakpoint_what_instruction_accesses(instruction_accesses_addr, breakpoint_label) end
   imgui.PopStyleColor()
   imgui.PopStyleVar()
 
@@ -713,10 +716,30 @@ function DrawImguiFrame()
       access_this_memory_addr_str = string.format('%08x', bool)
     end
   end
+  if imgui.IsItemHovered() then
+    if imgui.IsMouseDoubleClicked(imgui.constant.MouseButton.Left) then imgui.SetClipboardText(access_this_memory_addr_str) end
+    if imgui.IsMouseDoubleClicked(imgui.constant.MouseButton.Right) then
+      value = tonumber(imgui.GetClipboardText(), 16)
+      if value then
+        access_this_memory_addr = value
+        access_this_memory_addr_str = string.format('%x', access_this_memory_addr)
+      end
+    end
+  end
+  imgui.SameLine()
+  imgui.PushItemWidth(65)
+  imgui.safe.BeginCombo('##access-this-memory-bytes', access_this_memory_bytes_str , function()
+    for k, v in pairs(byte_list) do
+      if imgui.Selectable(v.name) then
+        access_this_memory_bytes = v.value
+        access_this_memory_bytes_str = v.name
+      end
+    end
+  end)
   imgui.SameLine()
   imgui.PushStyleVar(imgui.constant.StyleVar.FrameRounding, 3)
   imgui.PushStyleColor(imgui.constant.Col.Button, color.pink)
-  if imgui.Button('What Access this Memory##access-this-memory-button', 160, 22) then print(3) end
+  if imgui.Button('What Access this Memory##access-this-memory-button', 160, 22) then debugger:breakpoint_what_access_this_memory(access_this_memory_addr, access_this_memory_bytes, breakpoint_label) end
   imgui.PopStyleColor()
   imgui.PopStyleVar()
 
@@ -779,13 +802,13 @@ function DrawImguiFrame()
   imgui.SameLine()
   imgui.PushStyleVar(imgui.constant.StyleVar.FrameRounding, 3)
   imgui.PushStyleColor(imgui.constant.Col.Button, color.blue)
-  if imgui.Button('Read##read-write-pc-1-button', 70, 22) then breakpoint_read_write_pc_equality(read_write_pc_addr, 'Read', read_write_pc_bytes, break_point_label, read_write_pc_val, read_write_pc_equality) end
+  if imgui.Button('Read##read-write-pc-1-button', 70, 22) then debugger:breakpoint_read_write_pc_equality(read_write_pc_addr, 'Read', read_write_pc_bytes, breakpoint_label, read_write_pc_val, read_write_pc_equality) end
   imgui.PopStyleColor()
   imgui.PopStyleVar()
   imgui.SameLine()
   imgui.PushStyleVar(imgui.constant.StyleVar.FrameRounding, 3)
   imgui.PushStyleColor(imgui.constant.Col.Button, color.green)
-  if imgui.Button('Write##read-write-pc-2-button', 70, 22) then breakpoint_read_write_pc_equality(read_write_pc_addr, 'Write', read_write_pc_bytes, break_point_label, read_write_pc_val, read_write_pc_equality) end
+  if imgui.Button('Write##read-write-pc-2-button', 70, 22) then debugger:breakpoint_read_write_pc_equality(read_write_pc_addr, 'Write', read_write_pc_bytes, breakpoint_label, read_write_pc_val, read_write_pc_equality) end
   imgui.PopStyleColor()
   imgui.PopStyleVar()
 
@@ -898,7 +921,7 @@ function DrawImguiFrame()
   imgui.SameLine()
   imgui.PushStyleVar(imgui.constant.StyleVar.FrameRounding, 3)
   imgui.PushStyleColor(imgui.constant.Col.Button, color.orange)
-  if imgui.Button('Exec##exec-memory-button', 70, 22) then breakpoint_exec_memory_equality(exec_memory_addr, exec_memory_bytes, break_point_label, exec_memory_val, exec_memory_equality, exec_memory_pc) end
+  if imgui.Button('Exec##exec-memory-button', 70, 22) then debugger:breakpoint_exec_memory_equality(exec_memory_addr, exec_memory_bytes, breakpoint_label, exec_memory_val, exec_memory_equality, exec_memory_pc) end
   imgui.PopStyleColor()
   imgui.PopStyleVar()
   imgui.Separator()

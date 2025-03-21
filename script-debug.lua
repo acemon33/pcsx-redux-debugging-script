@@ -29,8 +29,14 @@ local color = {
   blue = 0xffD94545,
   green = 0xff00A64B,
   orange = 0xff02ABE2,
+  blue = 0xffd94545,
+  green = 0xff00a64b,
+  lightGreen = 0xff00bf56,
+  orange = 0xff02abe2,
   red = 0xff6666ff,
   pink = 0xffF066FF,
+  pink = 0xfff066ff,
+  grey = 0xffA69d9d,
 }
 
 
@@ -116,6 +122,7 @@ function debugger:breakpointOnWriteChangeFun(address, bytes, label)
 end
 function debugger:breakpointOnWriteChange(address, name, bytes)
   if address < 1 then return end
+  if address < 0 then return end
   if address < 0x80000000 then address = address + 0x80000000 end
   debugger.breakpointList[debugger.counter] = PCSX.addBreakpoint(address, 'Write', bytes, name, debugger.breakpointOnWriteChangeFun)
   debugger.counter = debugger.counter + 1
@@ -137,6 +144,7 @@ function debugger:breakpointReadWriteEqualityFun(exe_address, type_, bytes, name
 end
 function debugger:breakpointReadWriteEquality(address, type_, bytes, name, value, equality)
   if address < 1 then return end
+  if address < 0 then return end
   if address < 0x80000000 then address = address + 0x80000000 end
   debugger.breakpointList[debugger.counter] = debugger:breakpointReadWriteEqualityFun(address, type_, bytes, name, value, equality)
   debugger.counter = debugger.counter + 1
@@ -151,6 +159,7 @@ function debugger:breakpointExecRegisterEqualityFun(exe_address, name, register,
 end
 function debugger:breakpointExecRegisterEquality(address, name, register, equality, value)
   if address < 1 then return end
+  if address < 0 then return end
   if address < 0x80000000 then address = address + 0x80000000 end
   debugger.breakpointList[debugger.counter] = debugger:breakpointExecRegisterEqualityFun(address, name, register, equality, value)
   debugger.counter = debugger.counter + 1
@@ -165,6 +174,7 @@ function debugger:breakpointReadWritePCEqualityFun(exe_address, type_, bytes, na
 end
 function debugger:breakpointReadWritePCEquality(address, type_, bytes, name, pc, equality)
   if address < 1 then return end
+  if address < 0 then return end
   if address < 0x80000000 then address = address + 0x80000000 end
   debugger.breakpointList[debugger.counter] = debugger:breakpointReadWritePCEqualityFun(address, type_, bytes, name, pc, equality)
   debugger.counter = debugger.counter + 1
@@ -182,6 +192,7 @@ function debugger:breakpointExecMemoryEqualityFun(mem_address, type_, bytes, nam
 end
 function debugger:breakpointExecMemoryEquality(address, bytes, name, value, equality, pc)
   if address < 1 then return end
+  if address < 0 then return end
   if address < 0x80000000 then address = address + 0x80000000 end
   debugger.breakpointList[debugger.counter] = debugger:breakpointExecMemoryEqualityFun(address, 'Read', bytes, name, value, equality, pc)
   debugger.counter = debugger.counter + 1
@@ -210,6 +221,7 @@ end
 local instructionAccessesTable = {}
 function debugger:breakpointWhatInstructionAccesses(address, name)
   if address < 1 then return end
+  if address < 0 then return end
   if address < 0x80000000 then address = address + 0x80000000 end
   if instructionAccessesTable[address] ~= nil then return end
   instructionAccessesTable[address] = { address = address, data = {}, name = name, breakpoint = nil }
@@ -1009,6 +1021,7 @@ local function RenderChildWindows()
     imgui.PopID()
   end
   if #removeInstructionAccessesTable then
+  if next(removeInstructionAccessesTable) then
     for k, v in pairs(removeInstructionAccessesTable) do
       instructionAccessesTable[v] = nil
     end
@@ -1091,6 +1104,7 @@ local function RenderChildWindows()
     imgui.PopID()
   end
   if #removeAccessThisMemoryTable then
+  if next(removeAccessThisMemoryTable) then
     for k, v in pairs(removeAccessThisMemoryTable) do
       accessThisMemoryTable[v] = nil
     end

@@ -234,6 +234,14 @@ function debugger:breakpointWhatAccessThisMemory(address, bytes, name)
   accessThisMemoryTable[address].write_breakpoint = debugger:breakpointWhatAccessThisMemoryFun(address, bytes, 'Write', name, accessThisMemoryTable[address].data, 'W')
 end
 
+local watcher_table = {}
+function debugger:watch_value(address, bytes, name)
+  if address < 0 then return end
+  if address < 0x80000000 then address = address + 0x80000000 end
+  if watcher_table[address] ~= nil then return end
+  watcher_table[address] = { address = address, name = name, bytes = bytes, value_str = '', hex = false }
+end
+
 
 local breakpointLabel = ''
 local byteList = {
@@ -335,6 +343,12 @@ local accessThisMemoryAddrStr = ''
 local accessThisMemoryBytes = 1
 local accessThisMemoryBytesStr = 'Byte'
 local removeAccessThisMemoryTable = {}
+--
+local watcher_addr = 0
+local watcher_addr_str = ''
+local watcher_bytes = 1
+local watcher_bytes_str = 'Byte'
+local remove_watcher_table = {}
 
 
 local function Render0thRow()
@@ -886,7 +900,47 @@ local function Render8thRow()
   if imgui.Button('Exec##exec-memory-button', 70, 22) then debugger:breakpointExecMemoryEquality(execMemoryAddr, execMemoryBytes, breakpointLabel, execMemoryVal, execMemoryEquality, execMemoryPC) end
   imgui.PopStyleColor()
   imgui.PopStyleVar()
-  imgui.Separator()
+end
+
+local function render_9th_row()
+  imgui.Separator() imgui.TextUnformatted('|9| ') imgui.SameLine()
+  imgui.TextUnformatted('Address:')
+  imgui.SameLine()
+  imgui.SetNextItemWidth(75)
+  local bool, value = imgui.extra.InputText('##watcher-address', watcher_addr_str)
+  if bool then
+    value = tonumber(value, 16)
+    if (value) then
+      watcher_addr = value
+      watcher_addr_str = string.format('%08x', value)
+    end
+  end
+  if imgui.IsItemHovered() then
+    if imgui.IsMouseDoubleClicked(imgui.constant.MouseButton.Left) then imgui.SetClipboardText(watcher_addr_str) end
+    if imgui.IsMouseDoubleClicked(imgui.constant.MouseButton.Right) then
+      value = tonumber(imgui.GetClipboardText(), 16)
+      if value then
+        watcher_addr = value
+        watcher_addr_str = string.format('%x', value)
+      end
+    end
+  end
+  imgui.SameLine()
+  imgui.PushItemWidth(65)
+  imgui.safe.BeginCombo('##watcher-bytes', watcher_bytes_str , function()
+    for k, v in pairs(byte_list) do
+      if imgui.Selectable(v.name) then
+        watcher_bytes = v.value
+        watcher_bytes_str = v.name
+      end
+    end
+  end)
+  imgui.SameLine()
+  imgui.PushStyleVar(imgui.constant.StyleVar.FrameRounding, 3)
+  imgui.PushStyleColor(imgui.constant.Col.Button, color.grey)
+  if imgui.Button('Add##watcher-button', 70, 22) then debugger:watch_value(watcher_addr, watcher_bytes, breakpoint_label) end
+  imgui.PopStyleColor()
+  imgui.PopStyleVar()
 end
 
 local function RenderChildWindows()
@@ -1042,6 +1096,105 @@ local function RenderChildWindows()
     end
     removeAccessThisMemoryTable = {}
   end
+
+  if next(watcher_table) then
+    imgui.PushID('watcher_table')
+    imgui.safe.Begin('Watch List', function ()
+      imgui.BeginTable(string.format('watcher-table'), 5, imgui.constant.TableFlags.Borders)
+
+      imgui.TableSetupColumn("index", imgui.constant.TableColumnFlags.WidthFixed)
+      imgui.TableSetupColumn("Address", imgui.constant.TableColumnFlags.WidthFixed)
+      imgui.TableSetupColumn("Value", imgui.constant.TableColumnFlags.WidthFixed)
+      imgui.TableSetupColumn("Name", imgui.constant.TableColumnFlags.None)
+      imgui.TableSetupColumn("", imgui.constant.TableColumnFlags.None)
+      imgui.TableHeadersRow()
+
+      local i = 1
+      for k, v in pairs(watcher_table) do
+        imgui.TableNextRow()
+        imgui.TableNextColumn()
+        imgui.TextUnformatted(i)
+        imgui.TableNextColumn()
+        if imgui.SmallButton(string.format('%08x##v%d', v.address, v.address)) then
+          imgui.SetClipboardText(string.format('%08x', v.address))
+        end
+        imgui.TableNextColumn()
+        imgui.TextUnformatted(utility:read_value_from_memory(v.address, v.bytes))
+        imgui.TableNextColumn()
+        imgui.SetNextItemWidth(50)
+        imgui.TextUnformatted(v.name)
+        imgui.TableNextColumn()
+        imgui.SetNextItemWidth(45)
+        bool, value = imgui.extra.InputText(string.format('##f%d', v.address), watcher_table[v.address].value_str)
+        if bool then
+          local base = 10
+          local base_format = '%d'
+          if watcher_table[v.address].hex then
+            base = 16
+            base_format = '0x%x'
+          end
+          value = tonumber(value, base)
+          if value then
+            watcher_table[v.address].value_str = string.format(base_format, value)
+          end
+        end
+        imgui.SameLine()
+        bool, value = imgui.Checkbox(string.format('hex##wh%d', v.address), watcher_table[v.address].hex)
+        if bool then
+          watcher_table[v.address].hex = value
+          local base = 10
+          local base_format = '%d'
+          if value then
+            base = 16
+            base_format = '0x%x'
+          end
+          value = tonumber(watcher_table[v.address].value_str, base)
+          if value then
+            watcher_table[v.address].value_str = string.format(base_format, value)
+          end
+        end
+        imgui.SameLine()
+        if imgui.SmallButton(string.format('change##wc%d', v.address)) then
+          if watcher_table[v.address].hex then
+            value = tonumber(watcher_table[v.address].value_str, 16)
+          else
+            value = tonumber(watcher_table[v.address].value_str)
+          end
+          if value then
+            utility:set_value_in_memory(v.address, value, watcher_table[v.address].bytes)
+          end
+        end
+        imgui.SameLine()
+        if imgui.SmallButton(string.format('remove##w%d', v.address)) then
+          table.insert(remove_watcher_table, v.address)
+        end
+        i = i + 1
+      end
+
+      imgui.EndTable()
+
+      if imgui.Button('Copy All') then
+        local value = ''
+        for k, v in pairs(watcher_table) do
+          value = value .. string.format('%08x\n', v.address)
+        end
+        imgui.SetClipboardText(value)
+      end
+      imgui.SameLine()
+      if imgui.Button('Remove All') then
+        for k, v in pairs(watcher_table) do
+          table.insert(remove_watcher_table, v.address)
+        end
+      end
+    end)
+    imgui.PopID()
+  end
+  if next(remove_watcher_table) then
+    for k, v in pairs(remove_watcher_table) do
+      watcher_table[v] = nil
+    end
+    remove_watcher_table = {}
+  end
 end
 
 function DrawImguiFrame()
@@ -1055,6 +1208,8 @@ function DrawImguiFrame()
     Render6thRow()
     Render7thRow()
     Render8thRow()
+    render9thRow()
+    imgui.Separator()
     RenderChildWindows()
   end)
 end

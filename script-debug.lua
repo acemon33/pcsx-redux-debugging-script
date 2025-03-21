@@ -52,36 +52,9 @@ function utility:isLoad(code)
   local offsett = bit.band(code, 0xffff)
   return true, offsett
 end
-function utility:getRegisterValue(register)
-  if register == 0x01 then return PCSX.getRegisters().GPR.n.at
-  elseif register == 0x02 then return PCSX.getRegisters().GPR.n.v0
-  elseif register == 0x03 then return PCSX.getRegisters().GPR.n.v1
-  elseif register == 0x04 then return PCSX.getRegisters().GPR.n.a0
-  elseif register == 0x05 then return PCSX.getRegisters().GPR.n.a1
-  elseif register == 0x06 then return PCSX.getRegisters().GPR.n.a2
-  elseif register == 0x07 then return PCSX.getRegisters().GPR.n.a3
-  elseif register == 0x08 then return PCSX.getRegisters().GPR.n.t0
-  elseif register == 0x09 then return PCSX.getRegisters().GPR.n.t1
-  elseif register == 0x0a then return PCSX.getRegisters().GPR.n.t2
-  elseif register == 0x0b then return PCSX.getRegisters().GPR.n.t3
-  elseif register == 0x0c then return PCSX.getRegisters().GPR.n.t4
-  elseif register == 0x0d then return PCSX.getRegisters().GPR.n.t5
-  elseif register == 0x0e then return PCSX.getRegisters().GPR.n.t6
-  elseif register == 0x0f then return PCSX.getRegisters().GPR.n.t7
-  elseif register == 0x10 then return PCSX.getRegisters().GPR.n.s0
-  elseif register == 0x11 then return PCSX.getRegisters().GPR.n.s1
-  elseif register == 0x12 then return PCSX.getRegisters().GPR.n.s2
-  elseif register == 0x13 then return PCSX.getRegisters().GPR.n.s3
-  elseif register == 0x14 then return PCSX.getRegisters().GPR.n.s4
-  elseif register == 0x15 then return PCSX.getRegisters().GPR.n.s5
-  elseif register == 0x16 then return PCSX.getRegisters().GPR.n.s6
-  elseif register == 0x17 then return PCSX.getRegisters().GPR.n.s7
-  elseif register == 0x18 then return PCSX.getRegisters().GPR.n.t8
-  elseif register == 0x19 then return PCSX.getRegisters().GPR.n.t9
-  elseif register == 0x1c then return PCSX.getRegisters().GPR.n.gp
-  elseif register == 0x1d then return PCSX.getRegisters().GPR.n.sp
-  elseif register == 0x1f then return PCSX.getRegisters().GPR.n.ra
-  end
+
+function utility:get_register_value(register)
+  return PCSX.getRegisters().GPR.r[register]
 end
 function utility:get4ByteFromMemory(address)
   local mem = PCSX.getMemPtr()

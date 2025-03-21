@@ -26,15 +26,11 @@ local utility = {
 }
 
 local color = {
-  blue = 0xffD94545,
-  green = 0xff00A64B,
-  orange = 0xff02ABE2,
   blue = 0xffd94545,
   green = 0xff00a64b,
   lightGreen = 0xff00bf56,
   orange = 0xff02abe2,
   red = 0xff6666ff,
-  pink = 0xffF066FF,
   pink = 0xfff066ff,
   grey = 0xffA69d9d,
 }
@@ -101,7 +97,7 @@ function utility:setValueInMemory(address, value, bytes)
 end
 
 function debugger:breakpoint(address, name, type_, bytes)
-  if address < 1 then return end
+  if address < 0 then return end
   if address < 0x80000000 then address = address + 0x80000000 end
   debugger.breakpointList[debugger.counter] = PCSX.addBreakpoint(address, type_, bytes, name, function(address, w, c) PCSX.pauseEmulator() end)
   debugger.counter = debugger.counter + 1
@@ -121,7 +117,6 @@ function debugger:breakpointOnWriteChangeFun(address, bytes, label)
   end
 end
 function debugger:breakpointOnWriteChange(address, name, bytes)
-  if address < 1 then return end
   if address < 0 then return end
   if address < 0x80000000 then address = address + 0x80000000 end
   debugger.breakpointList[debugger.counter] = PCSX.addBreakpoint(address, 'Write', bytes, name, debugger.breakpointOnWriteChangeFun)
@@ -143,7 +138,6 @@ function debugger:breakpointReadWriteEqualityFun(exe_address, type_, bytes, name
   end)
 end
 function debugger:breakpointReadWriteEquality(address, type_, bytes, name, value, equality)
-  if address < 1 then return end
   if address < 0 then return end
   if address < 0x80000000 then address = address + 0x80000000 end
   debugger.breakpointList[debugger.counter] = debugger:breakpointReadWriteEqualityFun(address, type_, bytes, name, value, equality)
@@ -158,7 +152,6 @@ function debugger:breakpointExecRegisterEqualityFun(exe_address, name, register,
   end)
 end
 function debugger:breakpointExecRegisterEquality(address, name, register, equality, value)
-  if address < 1 then return end
   if address < 0 then return end
   if address < 0x80000000 then address = address + 0x80000000 end
   debugger.breakpointList[debugger.counter] = debugger:breakpointExecRegisterEqualityFun(address, name, register, equality, value)
@@ -173,7 +166,6 @@ function debugger:breakpointReadWritePCEqualityFun(exe_address, type_, bytes, na
   end)
 end
 function debugger:breakpointReadWritePCEquality(address, type_, bytes, name, pc, equality)
-  if address < 1 then return end
   if address < 0 then return end
   if address < 0x80000000 then address = address + 0x80000000 end
   debugger.breakpointList[debugger.counter] = debugger:breakpointReadWritePCEqualityFun(address, type_, bytes, name, pc, equality)
@@ -191,7 +183,6 @@ function debugger:breakpointExecMemoryEqualityFun(mem_address, type_, bytes, nam
   end)
 end
 function debugger:breakpointExecMemoryEquality(address, bytes, name, value, equality, pc)
-  if address < 1 then return end
   if address < 0 then return end
   if address < 0x80000000 then address = address + 0x80000000 end
   debugger.breakpointList[debugger.counter] = debugger:breakpointExecMemoryEqualityFun(address, 'Read', bytes, name, value, equality, pc)
@@ -220,7 +211,6 @@ end
 
 local instructionAccessesTable = {}
 function debugger:breakpointWhatInstructionAccesses(address, name)
-  if address < 1 then return end
   if address < 0 then return end
   if address < 0x80000000 then address = address + 0x80000000 end
   if instructionAccessesTable[address] ~= nil then return end
@@ -231,14 +221,16 @@ end
 function debugger:breakpointWhatAccessThisMemoryFun(address, bytes, type_, name, data, symbol)
   return PCSX.addBreakpoint(address, type_, bytes, name, function(address, w, c)
     local exe_address = PCSX.getRegisters().pc
-    if data[exe_address] == nil then data[exe_address] = { address = exe_address, count = 0, type = symbol, code = utility:get4ByteFromMemory(PCSX.getRegisters().pc) } end
+    if data[exe_address] == nil then
+      data[exe_address] = { address = exe_address, count = 0, type = symbol, code = utility:get4ByteFromMemory(exe_address) }
+    end
     data[exe_address].count = data[exe_address].count + 1
   end)
 end
 
 local accessThisMemoryTable = {}
 function debugger:breakpointWhatAccessThisMemory(address, bytes, name)
-  if address < 1 then return end
+  if address < 0 then return end
   if address < 0x80000000 then address = address + 0x80000000 end
   if accessThisMemoryTable[address] ~= nil then return end
   accessThisMemoryTable[address] = { address = address, data = {}, name = name, breakpoint = nil }
@@ -246,12 +238,12 @@ function debugger:breakpointWhatAccessThisMemory(address, bytes, name)
   accessThisMemoryTable[address].write_breakpoint = debugger:breakpointWhatAccessThisMemoryFun(address, bytes, 'Write', name, accessThisMemoryTable[address].data, 'W')
 end
 
-local watcher_table = {}
-function debugger:watch_value(address, bytes, name)
+local watcherTable = {}
+function debugger:watchValue(address, bytes, name)
   if address < 0 then return end
   if address < 0x80000000 then address = address + 0x80000000 end
-  if watcher_table[address] ~= nil then return end
-  watcher_table[address] = { address = address, name = name, bytes = bytes, value_str = '', hex = false }
+  if watcherTable[address] ~= nil then return end
+  watcherTable[address] = { address = address, name = name, bytes = bytes, valueStr = '', hex = false }
 end
 
 
@@ -356,11 +348,11 @@ local accessThisMemoryBytes = 1
 local accessThisMemoryBytesStr = 'Byte'
 local removeAccessThisMemoryTable = {}
 --
-local watcher_addr = 0
-local watcher_addr_str = ''
-local watcher_bytes = 1
-local watcher_bytes_str = 'Byte'
-local remove_watcher_table = {}
+local watcherAddr = 0
+local watcherAddrStr = ''
+local watcherBytes = 1
+local watcherBytesStr = 'Byte'
+local removeWatcherTable = {}
 
 
 local function Render0thRow()
@@ -452,7 +444,7 @@ local function Render2ndRow()
   imgui.PopStyleVar()
   imgui.SameLine()
   imgui.PushStyleVar(imgui.constant.StyleVar.FrameRounding, 3)
-  imgui.PushStyleColor(imgui.constant.Col.Button, color.green)
+  imgui.PushStyleColor(imgui.constant.Col.Button, color.lightGreen)
   if imgui.Button('Write on Change##read-write-change2-button', 100, 22) then debugger:breakpointOnWriteChange(readWriteChangeAddr, breakpointLabel, readWriteChangeBytes) end
   imgui.PopStyleColor()
   imgui.PopStyleVar()
@@ -914,43 +906,43 @@ local function Render8thRow()
   imgui.PopStyleVar()
 end
 
-local function render_9th_row()
+local function Render9thRow()
   imgui.Separator() imgui.TextUnformatted('|9| ') imgui.SameLine()
   imgui.TextUnformatted('Address:')
   imgui.SameLine()
   imgui.SetNextItemWidth(75)
-  local bool, value = imgui.extra.InputText('##watcher-address', watcher_addr_str)
+  local bool, value = imgui.extra.InputText('##watcher-address', watcherAddrStr)
   if bool then
     value = tonumber(value, 16)
     if (value) then
-      watcher_addr = value
-      watcher_addr_str = string.format('%08x', value)
+      watcherAddr = value
+      watcherAddrStr = string.format('%08x', value)
     end
   end
   if imgui.IsItemHovered() then
-    if imgui.IsMouseDoubleClicked(imgui.constant.MouseButton.Left) then imgui.SetClipboardText(watcher_addr_str) end
+    if imgui.IsMouseDoubleClicked(imgui.constant.MouseButton.Left) then imgui.SetClipboardText(watcherAddrStr) end
     if imgui.IsMouseDoubleClicked(imgui.constant.MouseButton.Right) then
       value = tonumber(imgui.GetClipboardText(), 16)
       if value then
-        watcher_addr = value
-        watcher_addr_str = string.format('%x', value)
+        watcherAddr = value
+        watcherAddrStr = string.format('%x', value)
       end
     end
   end
   imgui.SameLine()
   imgui.PushItemWidth(65)
-  imgui.safe.BeginCombo('##watcher-bytes', watcher_bytes_str , function()
-    for k, v in pairs(byte_list) do
+  imgui.safe.BeginCombo('##watcher-bytes', watcherBytesStr , function()
+    for k, v in pairs(byteList) do
       if imgui.Selectable(v.name) then
-        watcher_bytes = v.value
-        watcher_bytes_str = v.name
+        watcherBytes = v.value
+        watcherBytesStr = v.name
       end
     end
   end)
   imgui.SameLine()
   imgui.PushStyleVar(imgui.constant.StyleVar.FrameRounding, 3)
   imgui.PushStyleColor(imgui.constant.Col.Button, color.grey)
-  if imgui.Button('Add##watcher-button', 70, 22) then debugger:watch_value(watcher_addr, watcher_bytes, breakpoint_label) end
+  if imgui.Button('Add##watcher-button', 70, 22) then debugger:watchValue(watcherAddr, watcherBytes, breakpointLabel) end
   imgui.PopStyleColor()
   imgui.PopStyleVar()
 end
@@ -1020,7 +1012,6 @@ local function RenderChildWindows()
     end)
     imgui.PopID()
   end
-  if #removeInstructionAccessesTable then
   if next(removeInstructionAccessesTable) then
     for k, v in pairs(removeInstructionAccessesTable) do
       instructionAccessesTable[v] = nil
@@ -1103,7 +1094,6 @@ local function RenderChildWindows()
     end)
     imgui.PopID()
   end
-  if #removeAccessThisMemoryTable then
   if next(removeAccessThisMemoryTable) then
     for k, v in pairs(removeAccessThisMemoryTable) do
       accessThisMemoryTable[v] = nil
@@ -1111,7 +1101,7 @@ local function RenderChildWindows()
     removeAccessThisMemoryTable = {}
   end
 
-  if next(watcher_table) then
+  if next(watcherTable) then
     imgui.PushID('watcher_table')
     imgui.safe.Begin('Watch List', function ()
       imgui.BeginTable(string.format('watcher-table'), 5, imgui.constant.TableFlags.Borders)
@@ -1124,7 +1114,7 @@ local function RenderChildWindows()
       imgui.TableHeadersRow()
 
       local i = 1
-      for k, v in pairs(watcher_table) do
+      for k, v in pairs(watcherTable) do
         imgui.TableNextRow()
         imgui.TableNextColumn()
         imgui.TextUnformatted(i)
@@ -1133,54 +1123,54 @@ local function RenderChildWindows()
           imgui.SetClipboardText(string.format('%08x', v.address))
         end
         imgui.TableNextColumn()
-        imgui.TextUnformatted(utility:read_value_from_memory(v.address, v.bytes))
+        imgui.TextUnformatted(utility:readValueFromMemory(v.address, v.bytes))
         imgui.TableNextColumn()
         imgui.SetNextItemWidth(50)
         imgui.TextUnformatted(v.name)
         imgui.TableNextColumn()
         imgui.SetNextItemWidth(45)
-        bool, value = imgui.extra.InputText(string.format('##f%d', v.address), watcher_table[v.address].value_str)
+        bool, value = imgui.extra.InputText(string.format('##f%d', v.address), watcherTable[v.address].valueStr)
         if bool then
           local base = 10
           local base_format = '%d'
-          if watcher_table[v.address].hex then
+          if watcherTable[v.address].hex then
             base = 16
             base_format = '0x%x'
           end
           value = tonumber(value, base)
           if value then
-            watcher_table[v.address].value_str = string.format(base_format, value)
+            watcherTable[v.address].valueStr = string.format(base_format, value)
           end
         end
         imgui.SameLine()
-        bool, value = imgui.Checkbox(string.format('hex##wh%d', v.address), watcher_table[v.address].hex)
+        bool, value = imgui.Checkbox(string.format('hex##wh%d', v.address), watcherTable[v.address].hex)
         if bool then
-          watcher_table[v.address].hex = value
+          watcherTable[v.address].hex = value
           local base = 10
           local base_format = '%d'
           if value then
             base = 16
             base_format = '0x%x'
           end
-          value = tonumber(watcher_table[v.address].value_str, base)
+          value = tonumber(watcherTable[v.address].valueStr, base)
           if value then
-            watcher_table[v.address].value_str = string.format(base_format, value)
+            watcherTable[v.address].valueStr = string.format(base_format, value)
           end
         end
         imgui.SameLine()
         if imgui.SmallButton(string.format('change##wc%d', v.address)) then
-          if watcher_table[v.address].hex then
-            value = tonumber(watcher_table[v.address].value_str, 16)
+          if watcherTable[v.address].hex then
+            value = tonumber(watcherTable[v.address].valueStr, 16)
           else
-            value = tonumber(watcher_table[v.address].value_str)
+            value = tonumber(watcherTable[v.address].valueStr)
           end
           if value then
-            utility:set_value_in_memory(v.address, value, watcher_table[v.address].bytes)
+            utility:setValueInMemory(v.address, value, watcherTable[v.address].bytes)
           end
         end
         imgui.SameLine()
         if imgui.SmallButton(string.format('remove##w%d', v.address)) then
-          table.insert(remove_watcher_table, v.address)
+          table.insert(removeWatcherTable, v.address)
         end
         i = i + 1
       end
@@ -1189,25 +1179,25 @@ local function RenderChildWindows()
 
       if imgui.Button('Copy All') then
         local value = ''
-        for k, v in pairs(watcher_table) do
+        for k, v in pairs(watcherTable) do
           value = value .. string.format('%08x\n', v.address)
         end
         imgui.SetClipboardText(value)
       end
       imgui.SameLine()
       if imgui.Button('Remove All') then
-        for k, v in pairs(watcher_table) do
-          table.insert(remove_watcher_table, v.address)
+        for k, v in pairs(watcherTable) do
+          table.insert(removeWatcherTable, v.address)
         end
       end
     end)
     imgui.PopID()
   end
-  if next(remove_watcher_table) then
-    for k, v in pairs(remove_watcher_table) do
-      watcher_table[v] = nil
+  if next(removeWatcherTable) then
+    for k, v in pairs(removeWatcherTable) do
+      watcherTable[v] = nil
     end
-    remove_watcher_table = {}
+    removeWatcherTable = {}
   end
 end
 
@@ -1222,7 +1212,7 @@ function DrawImguiFrame()
     Render6thRow()
     Render7thRow()
     Render8thRow()
-    render9thRow()
+    Render9thRow()
     imgui.Separator()
     RenderChildWindows()
   end)
